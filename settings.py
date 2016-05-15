@@ -1,16 +1,15 @@
 import math
 
-
 class Pipe:
-	def __init__(self, length, diameter, relative_roughness, thickness, inclination):
+	def __init__(self, length, diameter, roughness, thickness, inclination):
 		assert type(length)==float or type(length)==int, "The length of the pipe must be a float or integar"
 		assert type(diameter) or type(diameter)==int, "The diameter of the pipe must be a float or integar"
-		assert type(relative_roughness) or type(relative_roughness)==int, "The relative_roughness of the pipe must be a float or integar"
+		assert type(roughness) or type(roughness)==int, "The roughness of the pipe must be a float or integar"
 		assert type(thickness) or type(thickness)==int, "The thickness of the pipe must be a float or integar"
 		assert type(inclination) or type(inclination)==int, "The inclination of the pipe must be a float or integar"
 		self.l=float(length)
 		self.d=float(diameter)
-		self.e=float(relative_roughness)
+		self.e=float(roughness)
 		self.t=float(thickness)
 		self.a=float(inclination)
 		self.z=float(self.l*math.sin(math.radians(self.a)))
@@ -65,11 +64,11 @@ class System:
 		k.T=T
 		self.sections.append(k)
 
-	def addPipe(self,length, diameter, relative_roughness, thickness, inclination):
+	def addPipe(self,length, diameter, roughness, thickness, inclination):
 		#add a pipe to system and connect nodes
 		k=self.sections[-1]
 		i=len(self.sections)
-		p=Pipe(length, diameter, relative_roughness, thickness, inclination)
+		p=Pipe(length, diameter, roughness, thickness, inclination)
 		p.massFlow=k.massFlow
 		p.pIn=k.p
 		p.TIn=k.T
@@ -111,37 +110,67 @@ class System:
 				alloc.append(c)
 			c+=1
 		d=[0]
+		c=1
 		while d[-1]+delta<tot_len:
+			changePipe=False
+			while d[-1]+delta>l[c]:
+				c+=1
+				changePipe=True
+			if changePipe and len(l)>c-1:
+				d.append(l[c-1])
 			d.append(d[-1]+delta)
 		d.append(tot_len)
 		x=[0]
 		y=[0]
 		index=[]
 		c=1
+		lc=0
 		p=self.sections[alloc[0]]
 		for j in d[:-1]:
 			changePipe=False
-			while j>l[c]:
+			while d[lc+1]>l[c]:
 				changePipe=True
 				c+=1
 			if changePipe:
 				p=self.sections[alloc[c-1]]
-			deltaX=p.x*delta/p.l
-			deltaY=p.z*delta/p.l
+			deltaX=p.x*(d[lc+1]-j)/p.l
+			deltaY=p.z*(d[lc+1]-j)/p.l
 			x.append(x[-1]+deltaX)
 			y.append(y[-1]+deltaY)
 			index.append(alloc[c-1])
+			lc+=1
 		index.append(alloc[-1])
 		self.simData['d']=d
 		self.simData['x']=x
 		self.simData['y']=y
 		self.simData['i']=index
 
+	def printGeometry(self):
+		print 'x\ty'
+		c=0
+		for i in self.simData['x']:
+			print i,'\t',self.simData['y'][c]
+			c+=1
 
 
+def newSystem(systemData):
+	keys=systemData.keys()
+	assert 'P0' in keys, "'P0' variable is missing"
+	assert 'T0' in keys, "'T0' variable is missing"
+	assert 'Ql' in keys, "'Ql' variable is missing"
+	assert 'sysVars' in keys, "'sysVars' variable is missing"
+	m=systemData['Ql']*800/86400		#86400 sec/day
+	sys=System(systemData['P0'],m,systemData['T0'])
+	for elem in systemData['sysVars']:
+		if elem['type']=='Pipe':
+			sys.addPipe(*elem['params'])
+		elif elem['type']=='Leg':
+			sys.addLeg(*elem['params'])
+		else:
+			assert False, "sysVars element type must be 'Pipe' of 'Leg'"
 
-
-
+	sys.setGeometry()
+	return sys
 
 
 		
