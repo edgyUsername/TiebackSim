@@ -1,18 +1,20 @@
 import math
 
 class Pipe:
-	def __init__(self, length, diameter, roughness, thickness, inclination):
+	def __init__(self, length, diameter, roughness, thickness, inclination, U):
 		assert type(length)==float or type(length)==int, "The length of the pipe must be a float or integar"
-		assert type(diameter) or type(diameter)==int, "The diameter of the pipe must be a float or integar"
-		assert type(roughness) or type(roughness)==int, "The roughness of the pipe must be a float or integar"
-		assert type(thickness) or type(thickness)==int, "The thickness of the pipe must be a float or integar"
-		assert type(inclination) or type(inclination)==int, "The inclination of the pipe must be a float or integar"
+		assert type(diameter)==float or type(diameter)==int, "The diameter of the pipe must be a float or integar"
+		assert type(roughness)==float or type(roughness)==int, "The roughness of the pipe must be a float or integar"
+		assert type(thickness)==float or type(thickness)==int, "The thickness of the pipe must be a float or integar"
+		assert type(inclination)==float or type(inclination)==int, "The inclination of the pipe must be a float or integar"
+		assert type(U)==float or type(U)==int, "The overall heat trasfer coefficient, U, must be a float or integar"
 		self.l=float(length)
 		self.d=float(diameter)
 		self.e=float(roughness)
 		self.t=float(thickness)
 		self.a=float(inclination)
 		self.z=float(self.l*math.sin(math.radians(self.a)))
+		self.U=float(U)
 		self.cosA=math.cos(math.radians(self.a))
 		self.sinA=math.sin(math.radians(self.a))
 		self.x=length*self.cosA
@@ -47,9 +49,11 @@ class Node:
 		self.T=None
 
 class System:
-	def __init__(self,p_in, massFlow, T_in):
+	def __init__(self,p_in, massFlow, T_in, PVT, pvtType):
 		self.sections=[] #list of nodes, pipes, and legs
-		self.simData={'t':[],'x':[],'d':[],'y':[],'i':[],'vars':{'T':[],'P':[],'v':[],'vapQ':[],'r':[]}} #t is time; x is x coord;y is y coord; d is distance; i is index of pipe; T is temp; P iss pressure; v is velocity; vap Q is mass vap quality; r is density
+		self.simData={'t':[],'x':[],'d':[],'y':[],'i':[],'vars':{'T':[],'P':[],'v_g':[],'v_l':[],'vapQ':[],'r_g':[],'r_l':[],'m_g':[],'m_l':[]}} #t is time; x is x coord;y is y coord; d is distance; i is index of pipe; T is temp; P iss pressure; v is velocity; vap Q is mass vap quality; r is density
+		self.pvtType=pvtType 
+		self.pvt=PVT
 		self.p_in=p_in
 		self.T_in=T_in
 		self.massFlow=massFlow
@@ -64,11 +68,11 @@ class System:
 		k.T=T
 		self.sections.append(k)
 
-	def addPipe(self,length, diameter, roughness, thickness, inclination):
+	def addPipe(self,length, diameter, roughness, thickness, inclination, U):
 		#add a pipe to system and connect nodes
 		k=self.sections[-1]
 		i=len(self.sections)
-		p=Pipe(length, diameter, roughness, thickness, inclination)
+		p=Pipe(length, diameter, roughness, thickness, inclination, U)
 		p.massFlow=k.massFlow
 		p.pIn=k.p
 		p.TIn=k.T
@@ -159,8 +163,19 @@ def newSystem(systemData):
 	assert 'T0' in keys, "'T0' variable is missing"
 	assert 'Ql' in keys, "'Ql' variable is missing"
 	assert 'sysVars' in keys, "'sysVars' variable is missing"
-	m=systemData['Ql']*800/86400		#86400 sec/day
-	sys=System(systemData['P0'],m,systemData['T0'])
+	assert 'PVT' in keys or 'comp' in keys,"'PVT'(black oil) or 'comp'(compositional) variables missing"
+	pvtType=None
+	if 'PVT' in keys:
+		pvt=systemData['PVT']
+		pvtType='bo'
+		m=(systemData['Ql']*pvt['r_l']/(1-pvt['vapQ']))/86400		#86400 sec/day
+	elif 'comp' in keys:
+		pvtType='comp'
+		pvt=systemData['comp']
+		#m
+	else:
+		m=None
+	sys=System(systemData['P0'],m,systemData['T0'],pvt,pvtType)
 	for elem in systemData['sysVars']:
 		if elem['type']=='Pipe':
 			sys.addPipe(*elem['params'])
@@ -173,7 +188,10 @@ def newSystem(systemData):
 	return sys
 
 
-		
+def extrapolate():
+	"""
+	returns list of all values between two boobies
+	"""	
 
 
 
