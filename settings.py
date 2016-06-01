@@ -190,7 +190,7 @@ def newSystem(systemData):
 
 def extrapolate():
 	"""
-	returns list of all values between two boobies
+	returns list of all values between two indices
 	"""	
 
 

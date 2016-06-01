@@ -24,6 +24,7 @@ def simulate(system, mode='section',devMultiplier=1,start='first',steps='all'):
 			Ql=(1-system.pvt['vapQ'])*system.massFlow/system.pvt['r_l']
 			Qg=system.pvt['vapQ']*system.massFlow/system.pvt['r_g']
 			H=Ql/(Ql+Qg) ####No Slip assumed
+			print H
 			ID=system.sections[simData['i'][position]].d-2*system.sections[simData['i'][position]].t
 			area=math.pi*math.pow(ID,2)/4
 			simData['T']=[system.T_in,]

@@ -3,6 +3,7 @@ from os import path
 sys.path.append(path.dirname( path.abspath(__file__)) ) 
 import settings
 from simulation.fluid_flow import b_and_b as bb
+from simulation.fluid_flow import p_and_a as pa
 from simulation import simulator as sim
 
 
@@ -61,6 +62,14 @@ sysParams= {
 
 sys=settings.newSystem(sysParams)
 #sys.printGeometry()
-
 sim.simulate(sys,mode='devision',steps=300,devMultiplier=5)
-print bb.calcPressureDrop(2.1e6,10,4,0.1,3,800,0.00003,0.002,10,0.00001,.2,100,50)
+
+print bb.calcPressureDrop(2.1e6,3.927,0.2503,3,800,0.00003,0.002,10,0.00001,.2,100,50)
+pa.calcPressureDrop(2.1e6,3.927,0.2503,3,800,0.00003,0.002,10,0.00001,.2,100,50)
+
+##h,Al,Ag,Sl,Sg,Si,t_wL,t_wG,t_i=pa.calc_h(800,30,.002,3e-5,5,2,0.0001,.2,0)
+
+##d,Af,Ac,Sl,Si,t_wL,t_i,FE=pa.calc_d(800,30,.002,1e-5,5,10,0.0001,.5,1,100,1e6)
+##print d
+##print pa.calc_d_min(800,30,.002,1e-5,5.0,5.0,0.0001,.5,-.5,100,1e6)
+

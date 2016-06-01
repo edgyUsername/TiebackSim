@@ -54,14 +54,20 @@ def estimateSigma (r_l,T,P):
 	sigma=sigma68-(T_F-68)*(sigma68-sigma100)/32
 	p=P/6894.757
 	sigma=sigma*math.exp(-8.6306e-4*p)
-	return sigma
+	return sigma/1000
 
-def calcPressureDrop(P0,v_g,v_l,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
-	H=((1-vapQ)/r_l)/(((1-vapQ)/r_l)+(vapQ/r_g))
-	v_m=v_g*(1-H)+v_l*H
-
+def calcPressureDrop(P0,m,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
+	Q_l=m*(1-vapQ)/r_l
+	Q_g=m*vapQ/r_g
+	H=Q_l/(Q_g+Q_l)
+	A=math.pi*math.pow(ID,2)/4
+	v_sg=Q_g/A
+	v_sl=Q_l/A
+	v_m=v_sg+v_sl
+	
 	nFR=math.pow(v_m,2)/(9.81*ID)
-	lambda_l=v_l/v_m
+	#lambda_l=v_l/v_m
+	lambda_l=H
 
 	L1=316*math.pow(lambda_l,0.302)
 	L2=0.0009252*math.pow(lambda_l,-2.4684)
@@ -81,7 +87,7 @@ def calcPressureDrop(P0,v_g,v_l,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
 		assert False
 	theta=math.asin(z/L)
 	sigma=estimateSigma(r_l,T,P0)
-	nVl=v_l*H*math.pow(r_l/(9.81*sigma*0.001),0.25)
+	nVl=v_sl*math.pow(r_l/(9.81*sigma*0.001),0.25)
 	if regime=='segregated':
 		a=bb_params['segregated']['a']
 		b=bb_params['segregated']['b']
@@ -204,13 +210,12 @@ def calcPressureDrop(P0,v_g,v_l,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
 	else:
 		S=ln(x)/(-0.0523+3.182*ln(x)-0.8725*math.pow(ln(x),2)+0.01853*math.pow(ln(x),4))
 	f_tp=f*math.exp(S)
-	v_sg=v_g*(1-H)
 	dp_f=0.5*f_tp*math.pow(v_m,2)*r_m*L/ID
 	####Ek####
 	Ek=v_m*v_sg*r_m/P0
 	####Total pressure drop####
 	dP_total=(dp_f+dp_PE)/(1-Ek)
-	#print 'lambda:\t',lambda_l,'\nHl:\t',yl,'\nf:\t',f,'\ndp pe:\t',dp_PE,'\ndp f:\t',dp_f,'\nRe:\t',Re,'\nflow pattern:\t',regime,'\nEk:\t',Ek
+	print 'lambda:\t',lambda_l,'\nHl:\t',yl,'\nf:\t',f,'\ndp pe:\t',dp_PE,'\ndp f:\t',dp_f,'\nRe:\t',Re,'\nflow pattern:\t',regime,'\nEk:\t',Ek
 	return P0-dP_total
 
 
