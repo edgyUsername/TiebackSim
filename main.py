@@ -44,28 +44,29 @@ sysParams= {
             )
         }
     ],
-    'PVT':{								#black oil pvt data
+    'PVT':{								#black oil pvt data at wellhead
     'r_g':41.6468,						#density of gas (kg/m3)
     'r_l':799.2982,						#density of liquid
     'm_g':0.0000131,					#viscosity of gas (Pa s)
     'm_l':0.002,						#viscosity of liquid
-    'vapQ':	0.8226974806477881			#mass vapour quality
+    'vapQ':	0.8226974806477881			#mass vapour quality 
     }
 }
 """
-1bpd=1.840130787037037e-06		        	m3/s 
+1bpd=1.840130787037037e-06		                	m3/s 
 1scfd=3.2774128000000003e-07		                m3/s
-1 lb/ft3=16.018						kg/m3
-1"=0.0254			    			m
-1psi=6894.757						Pa
+1 lb/ft3=16.018					                  	kg/m3
+1"=0.0254			    		                  	m
+1psi=6894.757						                Pa
 """
 
 sys=settings.newSystem(sysParams)
 #sys.printGeometry()
-sim.simulate(sys,mode='devision',steps=300,devMultiplier=5)
+#sim.simulate(sys,mode='devision',steps=300,devMultiplier=5)
+sim.simulate(sys)
 
 print bb.calcPressureDrop(2.1e6,3.927,0.2503,3,800,0.00003,0.002,10,0.00001,.2,100,50)
-pa.calcPressureDrop(2.1e6,3.927,0.2503,3,800,0.00003,0.002,10,0.00001,.2,100,50)
+print pa.calcPressureDrop(2.1e6,3.927,0.2503,3,800,0.00003,0.002,10,0.00001,.2,100,50)
 
 ##h,Al,Ag,Sl,Sg,Si,t_wL,t_wG,t_i=pa.calc_h(800,30,.002,3e-5,5,2,0.0001,.2,0)
 

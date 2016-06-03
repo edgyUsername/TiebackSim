@@ -215,8 +215,8 @@ def calcPressureDrop(P0,m,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
 	Ek=v_m*v_sg*r_m/P0
 	####Total pressure drop####
 	dP_total=(dp_f+dp_PE)/(1-Ek)
-	print 'lambda:\t',lambda_l,'\nHl:\t',yl,'\nf:\t',f,'\ndp pe:\t',dp_PE,'\ndp f:\t',dp_f,'\nRe:\t',Re,'\nflow pattern:\t',regime,'\nEk:\t',Ek
-	return P0-dP_total
+
+	return (P0-dP_total,yl,regime)
 
 
 

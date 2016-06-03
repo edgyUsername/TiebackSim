@@ -15,3 +15,6 @@ def calcDWf(roughness,ID,Re):
 	dCFA=dLA*(1+(z/2)/(math.pow((g+1),2)+(z/3.0)*(2*g-1)))
 	f=math.pow(a*(math.log(d/q,math.e)+dCFA),-2)
 	return f
+
+def calcFf(roughness,ID,Re):
+	return calcDWf(roughness,ID,Re)/4

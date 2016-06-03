@@ -49,16 +49,28 @@ class Node:
 		self.T=None
 
 class System:
-	def __init__(self,p_in, massFlow, T_in, PVT, pvtType):
+	def __init__(self,p_in,T_in, PVT, pvtType,p_out=None, massFlow=None):
 		self.sections=[] #list of nodes, pipes, and legs
-		self.simData={'t':[],'x':[],'d':[],'y':[],'i':[],'vars':{'T':[],'P':[],'v_g':[],'v_l':[],'vapQ':[],'r_g':[],'r_l':[],'m_g':[],'m_l':[]}} #t is time; x is x coord;y is y coord; d is distance; i is index of pipe; T is temp; P iss pressure; v is velocity; vap Q is mass vap quality; r is density
+		self.simData={
+			'vars':[
+				
+				{
+					'geo_index':None,'T':None,'P':None,'v_sg':None,'v_sl':None,'vapQ':None,'r_g':None,'r_l':None,'m_g':None,'m_l':None,'pattern':None,'hold_up':None,'Cp_l':None,'Cp_g':None
+				}
+				
+			],'geometry':[
+				{'index':None,'x':None,'y':None,'d':None}
+			]
+		}#t is time; x is x coord;y is y coord; d is distance; i is index of pipe; T is temp; P iss pressure; v is velocity; vap Q is mass vap quality; r is density
+		self.transSimData=[{'t':None,'vars':{}}]
 		self.pvtType=pvtType 
 		self.pvt=PVT
 		self.p_in=p_in
 		self.T_in=T_in
+		self.p_out=p_out
 		self.massFlow=massFlow
 		self.__addNode(p_in,T_in,massFlow)
-		self.devisions=100
+		self.devisions=10000
 		self.lengths=[0]
 
 	def __addNode(self,p,T, massFlow, prev=None, next=None):
@@ -144,16 +156,17 @@ class System:
 			index.append(alloc[c-1])
 			lc+=1
 		index.append(alloc[-1])
-		self.simData['d']=d
-		self.simData['x']=x
-		self.simData['y']=y
-		self.simData['i']=index
-
+		c=0
+		geometry=[]
+		for j in d:
+			geometry.append({'d':j,'index':index[c],'x':x[c],'y':y[c]})
+			c+=1
+		self.simData['geometry']=geometry
 	def printGeometry(self):
 		print 'x\ty'
 		c=0
-		for i in self.simData['x']:
-			print i,'\t',self.simData['y'][c]
+		for i in self.simData['geometry']:
+			print i['x'],'\t',i['y']
 			c+=1
 
 
@@ -175,7 +188,7 @@ def newSystem(systemData):
 		#m
 	else:
 		m=None
-	sys=System(systemData['P0'],m,systemData['T0'],pvt,pvtType)
+	sys=System(systemData['P0'],systemData['T0'],pvt,pvtType,massFlow=m)
 	for elem in systemData['sysVars']:
 		if elem['type']=='Pipe':
 			sys.addPipe(*elem['params'])
