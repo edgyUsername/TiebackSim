@@ -2,6 +2,7 @@ import sys
 from os import path
 sys.path.append(path.dirname( path.abspath(__file__)) ) 
 import settings
+import data_writer
 from simulation.fluid_flow import b_and_b as bb
 from simulation.fluid_flow import p_and_a as pa
 from simulation import simulator as sim
@@ -61,12 +62,14 @@ sysParams= {
 """
 
 sys=settings.newSystem(sysParams)
+#data_writer.write_geometry_file(sys)
 #sys.printGeometry()
 #sim.simulate(sys,mode='devision',steps=300,devMultiplier=5)
+
 sys,itterations=sim.forward_steady_calculate(sys)
-print itterations
-sys,itterations=sim.forward_steady_calculate(sys,flow='p_a')
-print itterations
+##sys,itterations=sim.forward_steady_calculate(sys,flow='p_a')
+data_writer.write_summary_file(sys)
+data_writer.write_pressure_profile(sys)
 ##print bb.calcPressureDrop(2.1e6,3.927,0.2503,3,800,0.00003,0.002,10,0.00001,.2,100,50)
 ##print pa.calcPressureDrop(2.1e6,3.927,0.2503,3,800,0.00003,0.002,10,0.00001,.2,100,50)
 
