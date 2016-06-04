@@ -70,7 +70,7 @@ class System:
 		self.p_out=p_out
 		self.massFlow=massFlow
 		self.__addNode(p_in,T_in,massFlow)
-		self.devisions=10000
+		self.devisions=float(100000)
 		self.lengths=[0]
 
 	def __addNode(self,p,T, massFlow, prev=None, next=None):

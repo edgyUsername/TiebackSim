@@ -63,10 +63,12 @@ sysParams= {
 sys=settings.newSystem(sysParams)
 #sys.printGeometry()
 #sim.simulate(sys,mode='devision',steps=300,devMultiplier=5)
-sim.simulate(sys)
-
-print bb.calcPressureDrop(2.1e6,3.927,0.2503,3,800,0.00003,0.002,10,0.00001,.2,100,50)
-print pa.calcPressureDrop(2.1e6,3.927,0.2503,3,800,0.00003,0.002,10,0.00001,.2,100,50)
+sys,itterations=sim.forward_steady_calculate(sys)
+print itterations
+sys,itterations=sim.forward_steady_calculate(sys,flow='p_a')
+print itterations
+##print bb.calcPressureDrop(2.1e6,3.927,0.2503,3,800,0.00003,0.002,10,0.00001,.2,100,50)
+##print pa.calcPressureDrop(2.1e6,3.927,0.2503,3,800,0.00003,0.002,10,0.00001,.2,100,50)
 
 ##h,Al,Ag,Sl,Sg,Si,t_wL,t_wG,t_i=pa.calc_h(800,30,.002,3e-5,5,2,0.0001,.2,0)
 
