@@ -5,7 +5,8 @@ sys.path.append( path.dirname(path.dirname( path.abspath(__file__)) ) )
 import settings
 from simulation.fluid_flow import b_and_b as b_b
 from simulation.fluid_flow import p_and_a as p_a
-
+from simulation.thermodynamics import glaso
+from simulation.heat_transfer import ambient_heat_transfer as ambient_heat_transfer
 def calcStepIndices(geometry,devs):
 	stepIndices=[]
 	devisions=len(geometry)
@@ -35,12 +36,12 @@ def calcStepIndices(geometry,devs):
 		assert False
 	return stepIndices
 
-def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='incompressible',devs=8):
+def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 	#tol_P in Pascals
 	assert type(tol_P)==int or type(tol_P)==float,"pressure convergence must be a number"
 	assert isinstance(system,settings.System),"system must be an instance of the System class"
 	assert flow in ['b_b','p_a']
-	assert VLE in ['incompressible',]
+	assert VLE in ['incompressible','ideal']
 	simData=system.simData
 	# {
 	# 	'vars':[
@@ -52,7 +53,7 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='incompressible',dev
 	# 	]
 	# }
 	position=0
-	if system.pvtType=='bo':
+	if system.pvtType=='bo' and VLE=='incompressible':
 		simData['vars']=[{
 			'geo_index':0,
 			'T':system.T_in,
@@ -66,7 +67,24 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='incompressible',dev
 			'm_l':system.pvt['m_l'],
 			'pattern':None,
 			'hold_up':None,
-			'Cp_l':None,
+			'Cp_l':system.pvt['Cp_l'],
+			'Cp_g':system.pvt['Cp_g']
+			}]
+	elif system.pvtType=='bo' and VLE=='ideal':
+		simData['vars']=[{
+			'geo_index':0,
+			'T':system.T_in,
+			'P':system.p_in,
+			'v_g':None,
+			'v_l':None,
+			'vapQ':system.pvt['vapQ'],
+			'r_g':system.pvt['r_g'],
+			'r_l':system.pvt['r_l'],
+			'm_g':1e-8,
+			'm_l':system.pvt['m_l'],
+			'pattern':None,
+			'hold_up':None,
+			'Cp_l':system.pvt['Cp_l'],
 			'Cp_g':None
 			}]
 	elif system.pvtType=='comp':
@@ -95,6 +113,7 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='incompressible',dev
 			thickness=pipe.t
 			ID=pipe.d-2*thickness
 			L=geometry[geo1]['d']-geometry[geo0]['d']
+			U=pipe.U
 
 			T0=prev['T']
 			r_g0=prev['r_g']
@@ -108,19 +127,28 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='incompressible',dev
 			P0=prev['P']
 			#pressure drop calc
 			if flow=='b_b':
-				P1,hold_up,pattern=p_a.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
+				P1,hold_up,pattern=b_b.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
 			elif flow=='p_a':
 				P1,hold_up,pattern=p_a.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
 			else:
 				assert False,'invalid pressure drop method'
 			#temp drop calc
-			T1=T0
+			T_out=system.T_amb
+			T1=ambient_heat_transfer.calculate_T(ID+2*thickness,L,massFlow,Cp_l0,Cp_g0,vapQ0,T0,T_out,U)
 			#pvt calc
-			if VLE=='incompressible':
+			if VLE=='incompressible' and system.pvtType=='bo':
 				r_g1=r_g0
 				r_l1=r_l0
 				m_g1=m_g0
-				m_l1=m_l0
+				m_l1=glaso.updateLiquidVisc(m_l0,r_l1,T1,T0)
+				vapQ1=vapQ0
+				Cp_g1=Cp_g0
+				Cp_l1=Cp_l0
+			elif VLE=='ideal' and system.pvtType=='bo':
+				r_g1=r_g0*P1*(T1+273.14)/(P0*(T0+273.14))
+				r_l1=r_l0
+				m_g1=m_g0
+				m_l1=glaso.updateLiquidVisc(m_l0,r_l1,T1,T0)
 				vapQ1=vapQ0
 				Cp_g1=Cp_g0
 				Cp_l1=Cp_l0
@@ -149,13 +177,14 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='incompressible',dev
 	system.simData['vars']=sim_vars
 	return system
 
-def forward_steady_calculate(system, tol_P=10,flow='b_b',VLE='incompressible'):
+def forward_steady_calculate(system, tol_P=10,flow='b_b',VLE='ideal'):
 	system=forward_steady_itterate(system)
 	P_out=system.simData['vars'][-1]['P']
 	error=tol_P*2
 	it_counter=0
 	devs=32
 	while error>tol_P:
+		print P_out
 		system=forward_steady_itterate(system,tol_P=tol_P,flow=flow,VLE=VLE,devs=devs)
 		P_out_new=system.simData['vars'][-1]['P']
 		error=abs(P_out_new-P_out)

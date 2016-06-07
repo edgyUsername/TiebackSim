@@ -7,11 +7,11 @@ from simulation.fluid_flow import b_and_b as bb
 from simulation.fluid_flow import p_and_a as pa
 from simulation import simulator as sim
 
-
 sysParams= {
     'P0':5515805.6,   #Pa abs
     'T0':79.44,        #deg C
     'Ql':317.9746,      #sm3/day
+    'T_amb':4,
     'sysVars':[
         {
         'type':'Pipe',  #Pipe or Leg
@@ -50,7 +50,9 @@ sysParams= {
     'r_l':799.2982,						#density of liquid
     'm_g':0.0000131,					#viscosity of gas (Pa s)
     'm_l':0.002,						#viscosity of liquid
-    'vapQ':	0.8226974806477881			#mass vapour quality 
+    'vapQ':	0.8226974806477881,			#mass vapour quality 
+    'Cp_l':2000,
+    'Cp_g':None
     }
 }
 """
@@ -66,8 +68,9 @@ sys=settings.newSystem(sysParams)
 #sys.printGeometry()
 #sim.simulate(sys,mode='devision',steps=300,devMultiplier=5)
 
-sys,itterations=sim.forward_steady_calculate(sys)
+sys,itterations=sim.forward_steady_calculate(sys,VLE='ideal')
 ##sys,itterations=sim.forward_steady_calculate(sys,flow='p_a')
+print itterations
 data_writer.write_summary_file(sys)
 data_writer.write_pressure_profile(sys)
 ##print bb.calcPressureDrop(2.1e6,3.927,0.2503,3,800,0.00003,0.002,10,0.00001,.2,100,50)

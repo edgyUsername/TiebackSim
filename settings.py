@@ -49,7 +49,7 @@ class Node:
 		self.T=None
 
 class System:
-	def __init__(self,p_in,T_in, PVT, pvtType,p_out=None, massFlow=None):
+	def __init__(self,p_in,T_in,T_amb, PVT, pvtType,p_out=None, massFlow=None):
 		self.sections=[] #list of nodes, pipes, and legs
 		self.simData={
 			'vars':[
@@ -72,6 +72,7 @@ class System:
 		self.__addNode(p_in,T_in,massFlow)
 		self.devisions=float(100000)
 		self.lengths=[0]
+		self.T_amb=T_amb if T_amb else T_in
 
 	def __addNode(self,p,T, massFlow, prev=None, next=None):
 		k=Node()
@@ -188,7 +189,7 @@ def newSystem(systemData):
 		#m
 	else:
 		m=None
-	sys=System(systemData['P0'],systemData['T0'],pvt,pvtType,massFlow=m)
+	sys=System(systemData['P0'],systemData['T0'],systemData['T_amb'], pvt,pvtType,massFlow=m)
 	for elem in systemData['sysVars']:
 		if elem['type']=='Pipe':
 			sys.addPipe(*elem['params'])
