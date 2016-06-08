@@ -178,7 +178,7 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 	return system
 
 def forward_steady_calculate(system, tol_P=10,flow='b_b',VLE='ideal'):
-	system=forward_steady_itterate(system)
+	system=forward_steady_itterate(system,tol_P=tol_P,flow=flow,VLE=VLE)
 	P_out=system.simData['vars'][-1]['P']
 	error=tol_P*2
 	it_counter=0
