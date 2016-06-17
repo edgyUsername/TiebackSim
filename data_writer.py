@@ -35,3 +35,36 @@ def write_pressure_profile(system):
 				writer.writerow({'d (m)':system.simData['geometry'][i['geo_index']]['d'], 'P (Pa)':i['P']})
 	except IOError:
 		print "failed to write pressure profile file. Make sure pressure profile.csv is not open by other program"
+
+def write_VLE(data):
+	try:
+		with open(sys.path[-1]+'/results/VLE.csv','wb') as csvfile:
+			fieldnames=['T (K)','P (kPa)','Vapor fract']
+			writer= csv.DictWriter(csvfile,fieldnames=fieldnames)
+			writer.writeheader()
+			for i in data:
+				writer.writerow({'P (kPa)':i['P']/float(1000),'T (K)':i['T']+273,'Vapor fract':i['V']})
+	except IOError:
+		print "failed to write VLE file. Make sure VLE.csv is not open by other program"
+
+def write_VLE2(data):
+	try:
+		with open(sys.path[-1]+'/results/VLEg.csv','wb') as csvfile:
+			fieldnames=['T (K)','P (kPa)','Vapor fract']
+			writer= csv.DictWriter(csvfile,fieldnames=fieldnames)
+			writer.writeheader()
+			for i in data:
+				writer.writerow({'P (kPa)':i['P']/float(1000),'T (K)':i['T']+273,'Vapor fract':i['V']})
+	except IOError:
+		print "failed to write VLE file. Make sure VLE.csv is not open by other program"
+
+def write_VLE3(data):
+	try:
+		with open(sys.path[-1]+'/results/VLEl.csv','wb') as csvfile:
+			fieldnames=['T (K)','P (kPa)','Vapor fract']
+			writer= csv.DictWriter(csvfile,fieldnames=fieldnames)
+			writer.writeheader()
+			for i in data:
+				writer.writerow({'P (kPa)':i['P']/float(1000),'T (K)':i['T']+273,'Vapor fract':i['V']})
+	except IOError:
+		print "failed to write VLE file. Make sure VLE.csv is not open by other program"

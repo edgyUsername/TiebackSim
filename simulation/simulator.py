@@ -5,6 +5,7 @@ sys.path.append( path.dirname(path.dirname( path.abspath(__file__)) ) )
 import settings
 from simulation.fluid_flow import b_and_b as b_b
 from simulation.fluid_flow import p_and_a as p_a
+from simulation.fluid_flow import one_phase as o_p
 from simulation.thermodynamics import glaso
 from simulation.heat_transfer import ambient_heat_transfer as ambient_heat_transfer
 def calcStepIndices(geometry,devs):
@@ -128,10 +129,17 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 			#pressure drop calc
 			if flow=='b_b':
 				P1,hold_up,pattern=b_b.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
+				pattern='liquid' if vapQ0==0 else pattern
+				pattern='gas' if vapQ0==1 else pattern
 			elif flow=='p_a':
-				P1,hold_up,pattern=p_a.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
+				if vapQ0 in (0,1):
+					P1,hold_up,pattern=b_b.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
+					pattern='liquid' if vapQ0==0 else 'gas'
+				else:
+					P1,hold_up,pattern=p_a.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
 			else:
 				assert False,'invalid pressure drop method'
+			assert P1>1, "pressure drop is too high"
 			#temp drop calc
 			T_out=system.T_amb
 			T1=ambient_heat_transfer.calculate_T(ID+2*thickness,L,massFlow,Cp_l0,Cp_g0,vapQ0,T0,T_out,U)
@@ -139,8 +147,9 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 			if VLE=='incompressible' and system.pvtType=='bo':
 				r_g1=r_g0
 				r_l1=r_l0
-				m_g1=m_g0
-				m_l1=glaso.updateLiquidVisc(m_l0,r_l1,T1,T0)
+				m_g1=m_g0 
+				m_l1=m_l0 #water/air experiment
+				#m_l1=glaso.updateLiquidVisc(m_l0,r_l1,T1,T0)
 				vapQ1=vapQ0
 				Cp_g1=Cp_g0
 				Cp_l1=Cp_l0
@@ -148,12 +157,13 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 				r_g1=r_g0*P1*(T1+273.14)/(P0*(T0+273.14))
 				r_l1=r_l0
 				m_g1=m_g0
-				m_l1=glaso.updateLiquidVisc(m_l0,r_l1,T1,T0)
+				m_l1=m_l0 #water/air experiment
+				#m_l1=glaso.updateLiquidVisc(m_l0,r_l1,T1,T0)
 				vapQ1=vapQ0
 				Cp_g1=Cp_g0
 				Cp_l1=Cp_l0
-			prev['v_g']=vapQ0*massFlow*8/(ID*ID*math.pi*(r_g0+r_g1)*(1-hold_up))
-			prev['v_l']=(1-vapQ0)*massFlow*8/(ID*ID*math.pi*(r_l0+r_l1)*(1-hold_up))
+			prev['v_g']=vapQ0*massFlow*4/(ID*ID*math.pi*r_g0*(1-hold_up)) if vapQ0>0 else 0
+			prev['v_l']=(1-vapQ0)*massFlow*4/(ID*ID*math.pi*r_l0*hold_up) if hold_up>0 else 0
 			prev['pattern']=pattern
 			prev['hold_up']=hold_up
 			sim_vars[-1]=prev

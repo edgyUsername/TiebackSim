@@ -1,4 +1,8 @@
 import math
+import sys
+from os import path
+sys.path.append(path.dirname(path.abspath(__file__)))
+from simulation.thermodynamics import setup_comp_data as configPVT
 
 class Pipe:
 	def __init__(self, length, diameter, roughness, thickness, inclination, U):
@@ -175,18 +179,23 @@ def newSystem(systemData):
 	keys=systemData.keys()
 	assert 'P0' in keys, "'P0' variable is missing"
 	assert 'T0' in keys, "'T0' variable is missing"
-	assert 'Ql' in keys, "'Ql' variable is missing"
+	assert 'Ql' in keys or 'm' in keys, "'Ql' or 'm' variable is missing"
 	assert 'sysVars' in keys, "'sysVars' variable is missing"
 	assert 'PVT' in keys or 'comp' in keys,"'PVT'(black oil) or 'comp'(compositional) variables missing"
 	pvtType=None
-	if 'PVT' in keys:
+	if 'comp' in keys:
+		pvtType='comp'
+		pvt=configPVT.get_props_and_equalize(systemData['comp'])
+		if 'm' in keys:
+			m=systemData['m']
+		
+	elif 'PVT' in keys:
 		pvt=systemData['PVT']
 		pvtType='bo'
-		m=(systemData['Ql']*pvt['r_l']/(1-pvt['vapQ']))/86400		#86400 sec/day
-	elif 'comp' in keys:
-		pvtType='comp'
-		pvt=systemData['comp']
-		#m
+		if 'm' in keys:
+			m=systemData['m']
+		else:
+			m=(systemData['Ql']*pvt['r_l']/(1-pvt['vapQ']))/86400		#86400 sec/day
 	else:
 		m=None
 	sys=System(systemData['P0'],systemData['T0'],systemData['T_amb'], pvt,pvtType,massFlow=m)

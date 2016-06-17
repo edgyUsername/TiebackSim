@@ -64,7 +64,6 @@ def calcPressureDrop(P0,m,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
 	v_sg=Q_g/A
 	v_sl=Q_l/A
 	v_m=v_sg+v_sl
-	
 	nFR=math.pow(v_m,2)/(9.81*ID)
 	#lambda_l=v_l/v_m
 	lambda_l=H
@@ -196,6 +195,7 @@ def calcPressureDrop(P0,m,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
 		yli=yli0*psi
 		####combine###
 		yl=A*yls+B*yli
+	yl=1.0 if yl>1.0 else yl
 	### gravitational potential
 	r_m_is=yl*r_l+(1-yl)*r_g
 	dp_PE=z*r_m_is*9.81
@@ -206,7 +206,7 @@ def calcPressureDrop(P0,m,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
 	f=g_s.calcDWf(roughness,ID,Re)
 	x=lambda_l/math.pow(yl,2)
 
-	if 0.5<x<1:
+	if x<1:
 		S=ln(2.2*x-1.2)
 	else:
 		S=ln(x)/(-0.0523+3.182*ln(x)-0.8725*math.pow(ln(x),2)+0.01853*math.pow(ln(x),4))
