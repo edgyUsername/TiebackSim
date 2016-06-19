@@ -5,8 +5,8 @@ import peng_robinson as pr
 import setup_comp_data as setPVT
 sys.path.append(path.dirname( path.dirname( path.dirname( path.abspath(__file__)))))
 import data_writer as write
-P=12e5
-T=-273.15+400
+P=2e5
+T=-273.15+300
 ##pvt={'nitrogen': {'comp': 0.79, 'params': {'acc': 0.0377, 'mm': 0.028, 't_c': 126.2, 'p_c': 34, 'v_c': 0.08921, '_id': 'nitrogen'}}, 'oxygen': {'comp': 0.21, 'params': {'acc': 0.0222, 'mm': 0.032, 't_c': 154.58, 'p_c': 50.43, 'v_c': 0.0734, '_id': 'oxygen'}}}
 
 pvt= setPVT.get_props_and_equalize([(63,'octane'),(36,'methane')])
@@ -153,4 +153,20 @@ pvt= setPVT.get_props_and_equalize([(63,'octane'),(36,'methane')])
 ##print pr.michelson_stability(pvt,T,P)
 ##print pr.check_phase_stability(pvt,T,P)
 ##print pr.get_initial_bubble_point(pvt)
-print pr.calculate_envelope(pvt)
+# print pr.calculate_envelope(pvt)
+
+import flash
+
+# print flash.get_binary_tangent_planes(pvt,T,P)
+P=1.013e5
+T=313.15-273.15
+pvt= setPVT.get_props_and_equalize([(8,'water'),(2,'aniline')])
+pvt['water']['k']={'aniline':0,'water':0}
+pvt['aniline']['k']={'aniline':0,'water':0}
+print pvt
+stuff=flash.Prep(pvt,P,T)
+print stuff.tangents
+print stuff.pvt
+print stuff.dominant
+# print pr.fug_minimum_gibbs(pvt,T, P, 1, phase='light',comp={'water':.0645,'propane':.9355})
+# print pr.fug_minimum_gibbs(setPVT.get_props_and_equalize([(1e8,'water'),(1e-4,'aniline')]),T, P, 1, phase='light')

@@ -184,7 +184,7 @@ def van_der_waal_coefs(pvt,T,P,comp=None):
 			x_j=comp[j]
 			a_j=comp_params[j]['a_i']
 			b_j=comp_params[j]['b_i']
-			a_ij+=x_j*math.sqrt(a_i*a_j)
+			a_ij+=x_j*math.sqrt(a_i*a_j)*(1-pvt[i]['k'][j])
 			b_ij+=x_j*(b_j+b_i)/2.
 		a_m+=a_ij*x_i
 		comp_params['a_ij']=a_ij
@@ -202,7 +202,7 @@ def solve_PR_for_Z(pvt,T,P,comp=None):
 	eos_params=van_der_waal_coefs(pvt,T,P,comp=comp)
 	a=eos_params['a_m']
 	b=eos_params['b_m']
-	T,R=T+273.16,8.314
+	T,R=T+273.15,8.314
 	A_1,B_1=a*P/((R*T)**2),b*P/(R*T)
 	A,B,C,D=1,(B_1-1),(A_1- 2*B_1 -3*(B_1**2)),-(A_1*B_1-(B_1**2)-(B_1**3))
 	Z= cubic_solver(A,B,C,D)
@@ -223,7 +223,7 @@ def ln_fug_coef(pvt,T,P,comp=None,phase="light",returnV=False):
 		V_m=V_roots[0]
 	else:
 		assert False,"phase must be either 'heavy' or 'light'"
-	T_k=T+273.14
+	T_k=T+273.15
 	V_ideal=8.314*T_k/P
 	ln_fug_coef={}
 	a_m,b_m=eos_params['a_m'],eos_params['b_m']
@@ -281,7 +281,7 @@ def fug_minimum_gibbs(pvt,T,P,n,comp=None,returnV=False,phase="None"):
 	Z_roots,eos_params=solve_PR_for_Z(pvt,T,P,comp=comp)
 	a,b=eos_params['a_m'],eos_params['b_m']
 	#D,B=a*n*n,b*n
-	R,T=8.314,T+273.14
+	R,T=8.314,T+273.15
 	Z_l=Z_roots[-1]		#gas like phase
 	Z_h=Z_roots[0]			#liquid like phase
 	V_l0=Z_l*R*T/P
@@ -312,7 +312,7 @@ def fug_minimum_gibbs(pvt,T,P,n,comp=None,returnV=False,phase="None"):
 		#### method2 ####
 		if Z_l<=0 or Z_h<=0:
 			print Z_roots
-		AA=2*sum([math.sqrt(eos_params['comp_params'][j]['a_i']*eos_params['comp_params'][i]['a_i']) for j in pvt])/a
+		AA=2*sum([comp[j]*math.sqrt(eos_params['comp_params'][j]['a_i']*eos_params['comp_params'][i]['a_i']) for j in pvt])/a
 		BB=eos_params['comp_params'][i]['b_i']/b
 		ln_fug_l=BB*(Z_l-1)-ln(Z_l-B)-A*(AA-BB)*ln((Z_l+((2**.5)+1)*B)/((Z_l-((2**.5)-1)*B)))/((2**1.5)*B)
 		ln_fug_h=BB*(Z_h-1)-ln(Z_h-B)-A*(AA-BB)*ln((Z_h+((2**.5)+1)*B)/((Z_h-((2**.5)-1)*B)))/((2**1.5)*B)
@@ -325,7 +325,7 @@ def fug_minimum_gibbs(pvt,T,P,n,comp=None,returnV=False,phase="None"):
 		# for z in comp:
 		# 	new_comp2[z]=comp[z] if not z==i else comp[z]+e
 		# 	new_comp1[z]=comp[z] if not z==i else comp[z]-e
-		# (V_1,eos1),(V_2,eos2)=solve_PR_for_V(pvt,(T-273.14),P,comp=normalise_comp(new_comp1)),solve_PR_for_V(pvt,(T-273.14),P,comp=normalise_comp(new_comp2))
+		# (V_1,eos1),(V_2,eos2)=solve_PR_for_V(pvt,(T-273.15),P,comp=normalise_comp(new_comp1)),solve_PR_for_V(pvt,(T-273.15),P,comp=normalise_comp(new_comp2))
 		# n1,n2=1-e,1+e
 		# V_1,V_2=V_1[0]*n1,V_2[0]*n2
 		# dF=Fn_h+FB_h*Bi+FD_h*Di
@@ -735,7 +735,7 @@ def flash_itterate(pvt,T,P,comp_l,comp_h,fraction):
 def ln_fug_div(pvt,T,P,V,comp,i):
 	eos_params=van_der_waal_coefs(pvt,T,P,comp=comp)
 	v=V
-	t=T+273.14
+	t=T+273.15
 	d=8.314*t/P
 	x=comp[i]
 	a=eos_params['comp_params'][i]['a_i']
@@ -978,7 +978,7 @@ def itterate_envelope(pvt,P,T,lnK,spec,spec_value):
 		F_fug_dif2=lnfug_l2[i]+ln(comp_l[i])-lnfug_h2[i]-ln(comp_h[i])
 		deriv_p=(F_fug_dif2- F_fug_dif1)/(2*e)
 		########## vary T ##########
-		T1,T2=math.exp(ln(T+273.14)-e)-273.14,math.exp(ln(T+273.14)+e)-273.14
+		T1,T2=math.exp(ln(T+273.15)-e)-273.15,math.exp(ln(T+273.15)+e)-273.15
 		lnfug_l1,lnfug_h1=fug_minimum_gibbs(pvt,T1,P,1,comp=comp_l,phase='light'),fug_minimum_gibbs(pvt,T1,P,1,comp=comp_h,phase='heavy')
 		lnfug_l2,lnfug_h2=fug_minimum_gibbs(pvt,T2,P,1,comp=comp_l,phase='light'),fug_minimum_gibbs(pvt,T2,P,1,comp=comp_h,phase='heavy')
 		F_fug_dif1=lnfug_l1[i]+ln(comp_l[i])-lnfug_h1[i]-ln(comp_h[i])
@@ -1013,7 +1013,7 @@ def itterate_envelope(pvt,P,T,lnK,spec,spec_value):
 			c+=1
 		J[N+2][N+1]=-1
 	elif spec=="T":
-		F[N+2]=ln(T+273.14)-ln(spec_value+273.14)
+		F[N+2]=ln(T+273.15)-ln(spec_value+273.15)
 		c=1
 		while c<=N+2:
 			J[N+2][c]=0
@@ -1031,7 +1031,7 @@ def itterate_envelope(pvt,P,T,lnK,spec,spec_value):
 	delta=solve_triangle_matrix(J,F)
 	lnK_new={}
 	P_new=math.exp(ln(P)+delta[N+1])
-	T_new=math.exp(ln(T+273.14)+delta[N+2])-273.14
+	T_new=math.exp(ln(T+273.15)+delta[N+2])-273.15
 	for i in index:
 		lnK_new[index[i]]=delta[i]+lnK[index[i]]
 	error=0

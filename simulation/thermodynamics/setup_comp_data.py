@@ -38,6 +38,7 @@ def get_props_and_equalize(compData):
 			compParams=ref[i[1].replace(',','').replace('-','').replace(' ','').lower()]
 		except:
 			print '"%s" not available in library or missing some params. You can ammend the Perrys_crit.csv file in the "databases" folder' %i[1]
+			raise
 		if compParams['_id'] in pvtParams:
 			assert False, "components must be unique!"
 		pvtParams[compParams['_id']]={'params':compParams,'comp':float(i[0])/total_moles}

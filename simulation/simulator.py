@@ -96,7 +96,6 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 
 	devs=20
 	stepIndices=calcStepIndices(simData['geometry'],devs)
-
 	geometry=simData['geometry']
 	sim_vars=simData['vars']
 	counter=0
@@ -105,8 +104,10 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 			pass
 		else:
 			prev=sim_vars[-1]
+			print prev
 			geo0=prev['geo_index']
 			geo1=i
+			print geo0,geo1
 			z=geometry[geo1]['y']-geometry[geo0]['y']
 			pipe_index=geometry[geo0]['index']
 			pipe=system.sections[pipe_index]
