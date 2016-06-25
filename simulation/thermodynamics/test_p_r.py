@@ -1,10 +1,8 @@
 import sys
 from os import path
 sys.path.append(path.dirname( path.abspath(__file__)) )
-import peng_robinson as pr
 import setup_comp_data as setPVT
 sys.path.append(path.dirname( path.dirname( path.dirname( path.abspath(__file__)))))
-import data_writer as write
 P=2e5
 T=-273.15+300
 ##pvt={'nitrogen': {'comp': 0.79, 'params': {'acc': 0.0377, 'mm': 0.028, 't_c': 126.2, 'p_c': 34, 'v_c': 0.08921, '_id': 'nitrogen'}}, 'oxygen': {'comp': 0.21, 'params': {'acc': 0.0222, 'mm': 0.032, 't_c': 154.58, 'p_c': 50.43, 'v_c': 0.0734, '_id': 'oxygen'}}}
@@ -155,7 +153,7 @@ pvt= setPVT.get_props_and_equalize([(63,'octane'),(36,'methane')])
 ##print pr.get_initial_bubble_point(pvt)
 # print pr.calculate_envelope(pvt)
 
-import flash
+# import flash
 # import flash2
 # print flash.get_binary_tangent_planes(pvt,T,P)
 # import permutate

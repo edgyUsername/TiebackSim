@@ -33,40 +33,8 @@ class Flash():
         self.pvt=pvt
         self.T=T
         self.P=P
-        # self._set_g_pure()
         self.phases=[]
         self.index=[i for i in pvt]
-
-    def _set_g_pure(self):
-        g_pure_i = {'heavy': {}, 'light': {}}
-        T = self.T + 273.15
-        P = self.P
-        pvt = self.pvt
-        for i in pvt:
-            z_i_roots, eos_params = peng_robinson.solve_PR_for_Z(generate_pvt(pvt, [i]), (T - 273.15), P, comp={i: 1.})
-            v_heavy = z_i_roots[0] * R * T / P
-            v_light = z_i_roots[-1] * R * T / P
-            a, b = eos_params['comp_params'][i]['a_i'], eos_params['comp_params'][i]['b_i']
-            g_pure_i['heavy'][i] = P * v_heavy / (R * T) + ln(R * T / (v_heavy - b)) + (a / (
-            R * T * b * (8 ** .5))) * ln(
-                (2 * v_heavy + 2 * b - b * (8 ** .5)) / (2 * v_heavy + 2 * b + b * (8 ** .5)))
-            g_pure_i['light'][i] = P * v_light / (R * T) + ln(R * T / (v_light - b)) + (a / (
-            R * T * b * (8 ** .5))) * ln(
-                (2 * v_light + 2 * b - b * (8 ** .5)) / (2 * v_light + 2 * b + b * (8 ** .5)))
-        self.g_pure = g_pure_i
-
-    def _g_peng_robinson(self, comp, phase='heavy'):
-        T, P, pvt, g_pure = self.T, self.P, self.pvt, self.g_pure
-        index = [i for i in comp]
-        n = len(index)
-        Z_roots, eos_params = peng_robinson.solve_PR_for_Z(pvt, T, P, comp={index[i]: comp[index[i]] for i in range(n)})
-        v = Z_roots[-1] * R * (T + 273.15) / P if phase == 'light' else Z_roots[0] * R * (T + 273.15) / P
-        a, b = eos_params['a_m'], eos_params['b_m']
-        T = T + 273.15
-        return P * v / (R * T) + ln(R * T / (v - b)) + (a / (R * T * b * (8 ** .5))) * ln(
-            (2 * 2 * b - b * (8 ** .5)) / (2 * v + 2 * b + b * (8 ** .5))) \
-               + sum([comp[index[j]] * ln(comp[index[j]]) for j in range(n)]) - sum(
-            [comp[index[j]] * g_pure[phase][index[j]] for j in range(n)])
 
     def _split(self):
         lnK=peng_robinson.get_wilson_lnK(self.pvt,self.T,self.P)
