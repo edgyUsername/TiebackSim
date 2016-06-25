@@ -310,12 +310,18 @@ def fug_minimum_gibbs(pvt,T,P,n,comp=None,returnV=False,phase="None"):
 		# ln_fug_h=Fn_h+FB_h*Bi+FD_h*Di-ln(Z_h)
 		# lnfug_h[i]=ln_fug_h
 		#### method2 ####
-		if Z_l<=0 or Z_h<=0:
-			print Z_roots
-		AA=2*sum([comp[j]*math.sqrt(eos_params['comp_params'][j]['a_i']*eos_params['comp_params'][i]['a_i']) for j in pvt])/a
-		BB=eos_params['comp_params'][i]['b_i']/b
-		ln_fug_l=BB*(Z_l-1)-ln(Z_l-B)-A*(AA-BB)*ln((Z_l+((2**.5)+1)*B)/((Z_l-((2**.5)-1)*B)))/((2**1.5)*B)
-		ln_fug_h=BB*(Z_h-1)-ln(Z_h-B)-A*(AA-BB)*ln((Z_h+((2**.5)+1)*B)/((Z_h-((2**.5)-1)*B)))/((2**1.5)*B)
+		if a==0 or b==0:
+			if phase=='light':
+				ln_fug_l =100
+				ln_fug_h=-100
+			elif phase=='heavy':
+				ln_fug_l =-100
+				ln_fug_h =100
+		else:
+			AA=2*sum([comp[j]*math.sqrt(eos_params['comp_params'][j]['a_i']*eos_params['comp_params'][i]['a_i']) for j in pvt])/a
+			BB=eos_params['comp_params'][i]['b_i']/b
+			ln_fug_l=BB*(Z_l-1)-ln(Z_l-B)-A*(AA-BB)*ln((Z_l+((2**.5)+1)*B)/((Z_l-((2**.5)-1)*B)))/((2**1.5)*B)
+			ln_fug_h=BB*(Z_h-1)-ln(Z_h-B)-A*(AA-BB)*ln((Z_h+((2**.5)+1)*B)/((Z_h-((2**.5)-1)*B)))/((2**1.5)*B)
 		lnfug_l[i]=ln_fug_l
 		lnfug_h[i]=ln_fug_h
 		####### TEST TEST TEST ####
@@ -364,7 +370,6 @@ def check_phase_stability(pvt,T,P,comp=None):
 		comp={}
 		for i in pvt:
 			comp[i]=pvt[i]['comp']
-	print lnK_wilson
 	########### estimate VLE and stab ########
 	V,comp_v,comp_l=find_vapor_frcn(pvt,lnK_wilson)
 	it=3
@@ -465,8 +470,8 @@ def pvt_calculator(pvt,T,P):
 	"""
 	phases=[]
 	#stable,fraction,comps=check_phase_stability(pvt,T,P)
-	#stable,fraction,comps=michelson_stability(pvt,T,P)
-	stable=False
+	stable,fraction,comps=michelson_stability(pvt,T,P)
+	# stable=False
 	K_wilson=get_wilson_lnK(pvt,T,P)
 	fraction,comp_v,comp_l=find_vapor_frcn(pvt,K_wilson)
 	comps={'l':comp_v,'h':comp_l}
@@ -488,15 +493,15 @@ def pvt_calculator(pvt,T,P):
 				##### newton #############
 				comp_ln,comp_hn=flash_itterate(pvt,T,P,comp_l,comp_h,fraction)
 			except:
-				print "failed newton at P=%s, T=%s"%(P,T)
+				# print "failed newton at P=%s, T=%s"%(P,T)
 				try:
 					fract,comp_ln,comp_hn=successive_substitution(pvt,T,P,comp_l,comp_h)
 				except:
-					print "failed successive substitution at P=%s, T=%s"%(P,T)
+					# print "failed successive substitution at P=%s, T=%s"%(P,T)
 					break
 			if it==20:
-				print 'failed to converge at P=%s and T=%s' %(P,T)
-			print comp_l,comp_h
+				pass
+				# print 'failed to converge at P=%s and T=%s' %(P,T)
 			comp_ln,comp_hn=normalise_comp(comp_ln),normalise_comp(comp_hn)
 			##### successive sub #####
 			# try:
@@ -520,7 +525,6 @@ def pvt_calculator(pvt,T,P):
 		for i in pvt:
 			K[i]=ln(comp_l[i]/comp_h[i])
 		fraction=find_vapor_frcn(pvt,K)[0]
-		print it
 	##############
 	return {'phases':phases,'V':fraction}
 def michelson_stability(pvt,T,P,comp=None):
@@ -532,17 +536,14 @@ def michelson_stability(pvt,T,P,comp=None):
 	lnK_wilson=get_wilson_lnK(pvt,T,P)
 	### create vapour ###
 	c,triv_v=0,False
-	print "vapor:"
 	while c<100 and not triv_v:
 		lnK=lnK if not c==0 else lnK_wilson
 		new_comp={}
 		S_v=0
 		for i in pvt:
-			print '\t',comp[i],lnK[i]
 			new_comp[i]=comp[i]*math.exp(lnK[i])
 			S_v+=new_comp[i]
 		new_comp=normalise_comp(new_comp)
-		print '\t',new_comp
 		lnfug_v=fug_minimum_gibbs(pvt,T,P,1,comp=new_comp)
 		lnR={}
 		for i in pvt:
@@ -556,17 +557,14 @@ def michelson_stability(pvt,T,P,comp=None):
 	lnK_wilson=get_wilson_lnK(pvt,T,P)
 	### create liquid ###
 	c,triv_l=0,False
-	print "liquid:"
 	while c<100 and not triv_l:
 		lnK=lnK if not c==0 else lnK_wilson
 		new_comp_l={}
 		S_l=0
 		for i in pvt:
-			print '\t',comp[i],lnK[i]
 			new_comp_l[i]=comp[i]/math.exp(lnK[i])
 			S_l+=new_comp_l[i]
 		new_comp_l=normalise_comp(new_comp_l)
-		print '\t',new_comp_l
 		lnfug_l=fug_minimum_gibbs(pvt,T,P,1,comp=new_comp_l)
 		lnR={}
 		for i in pvt:
@@ -713,11 +711,8 @@ def flash_itterate(pvt,T,P,comp_l,comp_h,fraction):
 			J[c+N]=F_mass
 		c+=1
 	################## solve Newton-gauss #################
-	print J,F
-	print X
 	J,F=gauss_elim(J,F)
 	delta=solve_triangle_matrix(J,F)
-	print delta
 	comp_l={}
 	comp_h={}
 	i=1
@@ -736,10 +731,9 @@ def ln_fug_div(pvt,T,P,V,comp,i):
 	eos_params=van_der_waal_coefs(pvt,T,P,comp=comp)
 	v=V
 	t=T+273.15
-	d=8.314*t/P
 	x=comp[i]
 	a=eos_params['comp_params'][i]['a_i']
-	m=eos_params['a_m']-a*x*x
+	m=eos_params['a_m']-a*x**2
 	b=eos_params['comp_params'][i]['b_i']
 	n=eos_params['b_m']-b*x
 	div=-125*math.pow(3/2,2)*b*(b*(abs(a)*x*x+m)-2*(b*x+n)*math.sqrt(a*(abs(a)*x*x+m)))*ln((math.sqrt(2)*(b*x+n)+b*x+v+n)/(-math.sqrt(2)*(b*x+n)+b*x+v+n))/(4157*t*math.pow(b*x+n,3))+125*math.sqrt(2)*(-2*b*math.sqrt(a*(abs(a)*x*x+m))-2*a*abs(a)*x*(b*x+n)/math.sqrt(a*(abs(a)*x*x+m))+2*abs(a)*b*x)*ln((math.sqrt(2)*(b*x+n)+b*x+v+n)/(-math.sqrt(2)*(b*x+n)+b*x+v+n))/(4157*t*math.pow(b*x+n,2))-500*b*v*(abs(a)*x*x+m)/(4157*t*(2*math.pow(b*x+n,2)-math.pow(b*x+v+n,2)))+1000*abs(a)*v*x*(-b*x-n+b)/(4157*t*(2*math.pow(b*x+n,2)-math.pow(b*x+v+n,2)))-500*v*(-b*x-n+b)*(4*b*(b*x+n)-2*b*(b*x+v+n))*(abs(a)*x*x+m)/(4157*t*math.pow(2*math.pow(b*x+n,2)-math.pow(b*x+v+n,2),2))+125*math.sqrt(2)*(-math.sqrt(2)*(b*x+n)+b*x+v+n)*((math.sqrt(2)*b+b)/(-math.sqrt(2)*(b*x+n)+b*x+v+n)-(b-math.sqrt(2)*b)*(math.sqrt(2)*(b*x+n)+b*x+v+n)/math.pow(-math.sqrt(2)*(b*x+n)+b*x+v+n,2))*(b*(abs(a)*x*x+m)-2*(b*x+n)*math.sqrt(a*(abs(a)*x*x+m)))/(4157*t*math.pow(b*x+n,2)*(math.sqrt(2)*(b*x+n)+b*x+v+n))+b*(-b*x-n+b)/math.pow(-b*x+v-n,2)
@@ -1060,6 +1054,4 @@ def calculate_envelope(pvt):
 			delta_S[i]=delta_it[i]+ delta_S[i] if i in delta_S else delta_it[i]
 		delta_S['P'],delta_S['T']=delta_it['P']+ delta_S['P'] if 'P' in delta_S else delta_it['P'],delta_it['T']+ delta_S['T'] if 'T' in delta_S else delta_it['T']
 		it+=1
-		print it,P,T,lnK,delta_S
-	print delta_S
 	return P,T,lnK,error,delta_it
