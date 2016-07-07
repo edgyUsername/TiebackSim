@@ -102,7 +102,7 @@ def itterate_d(d,r_l,r_g,m_l,m_g,v_sl,v_sg,roughness,ID,theta,T,P):
 	D_f=4*d*(ID-d*ID)
 	v_f=v_sl*area*(1-FE)/Af
 	Re_f=D_f*r_l*v_f/m_l
-	f_f=g_s.calcFf(roughness,ID,Re_f)
+	f_f=g_s.calcFf(roughness,ID,Re_f) if Re_f>2320 else 16/Re_f
 	t_wL=f_f*r_l*math.pow(v_f,2)/2
 	
 	v_c=(v_sg+v_sl*FE)*area/Ac
@@ -110,8 +110,8 @@ def itterate_d(d,r_l,r_g,m_l,m_g,v_sl,v_sg,roughness,ID,theta,T,P):
 	mass_v=v_sg*area*r_g
 	r_c=(FE*mass_l+mass_v)/(FE*mass_l/r_l+mass_v/r_g)
 	Re_c=(ID-2*d*ID)*v_c*r_c/m_g
-	f_c=g_s.calcFf(0,ID-2*d*ID,Re_c)
-	f_i=0.24*math.pow(sigma/(r_c*(ID-2*d*ID)*math.pow(v_c,2)),0.085)*math.pow(Re_f,0.305)
+	f_c=g_s.calcFf(0,ID-2*d*ID,Re_c) if Re_c>2320 else 16/Re_c
+	f_i=0.24*f_c*((sigma/(r_c*(ID-2*d*ID)*(v_c**2)))**0.085)*(Re_f**0.305)
 
 	t_i=f_i*r_c*(v_c-v_f)*abs(v_c-v_f)/2
 	y=t_wL*Sl/Af-t_i*Si*(1/Af+1/Ac)+(r_l-r_c)*9.81*math.sin(theta)
@@ -237,7 +237,7 @@ def calcPressureDrop(P0,m,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
 			cos_t=math.cos(theta)
 			cos_t=cos_t if cos_t>0.02 else 0.02
 			dAl=-4*h*ID*(h*ID-ID)/(ID*math.sqrt(1-math.pow(2*h-1,2)))
-			v_bridge=(1-h*ID)*math.sqrt((r_l-r_g)*9.81*Ag*cos_t/(r_g*dAl))
+			v_bridge=(1-h)*math.sqrt((r_l-r_g)*9.81*Ag*cos_t/(r_g*dAl))
 			H_is=Al/(Al+Ag)
 			v_g=v_sg/(1-H_is)
 			v_l=v_sl/H_is

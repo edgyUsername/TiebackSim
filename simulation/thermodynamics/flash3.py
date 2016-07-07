@@ -40,10 +40,9 @@ class Flash():
         lnK=peng_robinson.get_wilson_lnK(self.pvt,self.T,self.P)
         V,comp_v,comp_l=peng_robinson.find_vapor_frcn(self.pvt,lnK)
         self.phases=[{'frac':V,'comp':comp_v},{'frac':1-V,'comp':comp_l}]
-
     def _successive_sub(self):
-        fug_v=peng_robinson.fug_minimum_gibbs(self.pvt,self.T,self.P,1.,comp=self.phases[0]['comp'],phase='light')
-        fug_l=peng_robinson.fug_minimum_gibbs(self.pvt,self.T,self.P,1.,comp=self.phases[1]['comp'],phase='heavy')
+        fug_v=peng_robinson.fug_minimum_gibbs(self.pvt,self.T,self.P,1.,comp=normalize_comp(self.phases[0]['comp']),phase='light')
+        fug_l=peng_robinson.fug_minimum_gibbs(self.pvt,self.T,self.P,1.,comp=normalize_comp(self.phases[1]['comp']),phase='heavy')
         lnK={i:fug_l[i]-fug_v[i] for i in self.pvt}
         V,comp_v,comp_l=peng_robinson.find_vapor_frcn(self.pvt,lnK)
         self.phases=[{'frac':V,'comp':comp_v},{'frac':1-V,'comp':comp_l}]
@@ -177,11 +176,13 @@ class Flash():
         self.phases=[{'type':'gas','frac':gas['frac'],'comp':gas['comp']},
                      {'type': 'hc', 'frac': (1-aq_frac)*liq['frac'], 'comp': normalize_comp(hc_comp)},
                      {'type': 'aq', 'frac': aq_frac* liq['frac'], 'comp': normalize_comp(aq_comp)}]
+        for p in range(len(self.phases)):
+            if self.phases[p]['frac']==0:
+                self.phases.pop(p)
 
     def equilibriate(self):
         self._split()
-        for i in range(3):
-            R_old,K_old=self._successive_sub()
+        R_old,K_old=self._successive_sub()
         frac_old = self.phases[0]['frac']
         tol=1e-8
         error=tol+1

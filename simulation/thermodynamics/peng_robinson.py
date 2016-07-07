@@ -28,14 +28,14 @@ def find_vapor_frcn(pvt,K):
 	comp_v={}
 	comp_l={}
 	V=-1
-	if g_0<=0:	#bubble point
+	if g_0<-1e-15:	#bubble point
 		V=0.0
 		for i in pvt:
 			comp_v[i]=pvt[i]['comp']*math.exp(K[i])
 			comp_l[i]=pvt[i]['comp']
 	else:
 		g_1=rachford_rice_g(1,pvt,K)
-		if g_1>=0: #dew point
+		if g_1>1e-15: #dew point
 			V=1.0
 			for i in pvt:
 				comp_v[i]=pvt[i]['comp']
@@ -183,8 +183,8 @@ def solve_PR_for_Z(pvt,T,P,comp=None):
 	A,B,C,D=1,(B_1-1),(A_1- 2*B_1 -3*(B_1**2)),-(A_1*B_1-(B_1**2)-(B_1**3))
 	Z= cubic_solver(A,B,C,D)
 	V=[R*T*i/P for i in Z]
-	if len(V)==0:
-		print T,P,comp
+	# if len(V)==0:
+	# 	print T,P,comp
 	return (Z,eos_params)
 def fug_minimum_gibbs(pvt,T,P,n,comp=None,returnV=False,phase="None"):
 	"""calculates fug coefs that correspond to minimum gibbs energy"""

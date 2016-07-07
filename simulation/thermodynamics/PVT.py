@@ -6,7 +6,7 @@ def get_props(pvt,T,P):
     sys=flash3.Flash(pvt,T,P)
     phases=sys.equilibriate()
     sys=pr_thermo.System(pvt,phases,T,P)
-    props={'h':0}
+    props={'h':0,'r_g':2,'m_g':.00002,'Cp_g':2000,'Cp_l':4000,'m_l':.002,'r_l':400}
     liq=[]
     c=0
     tot_mass=0

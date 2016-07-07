@@ -1,12 +1,10 @@
-import sys
 import math
-from os import path
-sys.path.append( path.dirname(path.dirname( path.abspath(__file__)) ) ) 
 import settings
 from simulation.fluid_flow import b_and_b as b_b
 from simulation.fluid_flow import p_and_a as p_a
 from simulation.fluid_flow import one_phase as o_p
-from simulation.thermodynamics import glaso
+# from simulation.thermodynamics import glaso
+from simulation.thermodynamics import PVT
 from simulation.heat_transfer import ambient_heat_transfer as ambient_heat_transfer
 def calcStepIndices(geometry,devs):
 	stepIndices=[]
@@ -42,7 +40,7 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 	assert type(tol_P)==int or type(tol_P)==float,"pressure convergence must be a number"
 	assert isinstance(system,settings.System),"system must be an instance of the System class"
 	assert flow in ['b_b','p_a']
-	assert VLE in ['incompressible','ideal']
+	assert VLE in ['incompressible','ideal','pr']
 	simData=system.simData
 	# {
 	# 	'vars':[
@@ -88,9 +86,15 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 			'Cp_l':system.pvt['Cp_l'],
 			'Cp_g':None
 			}]
-	elif system.pvtType=='comp':
-		#calculate initial pvt params
-		pass
+	elif system.pvtType=='comp' and VLE=='pr':
+		simData['vars'] = [PVT.get_props(system.pvt,system.T_in,system.p_in)]
+		simData['vars'][0]['geo_index']= 0
+		simData['vars'][0]['T']=system.T_in
+		simData['vars'][0]['P']=system.p_in
+		simData['vars'][0]['v_g']=None,
+		simData['vars'][0]['v_l']=None,
+		simData['vars'][0]['pattern']=None,
+		simData['vars'][0]['hold_up']=None
 	else:
 		assert False, 'pvt type error'
 
@@ -104,10 +108,8 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 			pass
 		else:
 			prev=sim_vars[-1]
-			print prev
 			geo0=prev['geo_index']
 			geo1=i
-			print geo0,geo1
 			z=geometry[geo1]['y']-geometry[geo0]['y']
 			pipe_index=geometry[geo0]['index']
 			pipe=system.sections[pipe_index]
@@ -128,18 +130,21 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 			massFlow=system.massFlow
 			P0=prev['P']
 			#pressure drop calc
-			if flow=='b_b':
+			if vapQ0 < 1e-3:
+				P1=o_p.calcPressureDrop(P0,massFlow,r_l0,m_l0,z,roughness,ID,L,T0)
+				pattern = 'liquid'
+				hold_up=1.
+			elif vapQ0 > 1 - 1e-3:
+				P1=o_p.calcPressureDrop(P0,massFlow,r_g0,m_g0,z,roughness,ID,L,T0)
+				pattern='gas'
+				hold_up=0.
+			elif flow=='b_b':
 				P1,hold_up,pattern=b_b.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
-				pattern='liquid' if vapQ0==0 else pattern
-				pattern='gas' if vapQ0==1 else pattern
 			elif flow=='p_a':
-				if vapQ0 in (0,1):
-					P1,hold_up,pattern=b_b.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
-					pattern='liquid' if vapQ0==0 else 'gas'
-				else:
-					P1,hold_up,pattern=p_a.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
+				P1,hold_up,pattern=p_a.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
 			else:
 				assert False,'invalid pressure drop method'
+			# print 'P0: %s, P1: %s, T0: %s, L: %s, liq visc: %s, gas visc: %s, vapQ: %s, liq density: %s, gas density: %s' %(P0,P1,T0,L,m_l0,m_g0,vapQ0,r_l0,r_g0)
 			assert P1>1, "pressure drop is too high"
 			#temp drop calc
 			T_out=system.T_amb
@@ -163,6 +168,15 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 				vapQ1=vapQ0
 				Cp_g1=Cp_g0
 				Cp_l1=Cp_l0
+			elif VLE=='pr' and system.pvtType=='comp':
+				props=PVT.get_props(system.pvt,T1,P1)
+				r_g1=props['r_g']
+				r_l1=props['r_l']
+				m_g1=props['m_g']
+				m_l1=props['m_l']
+				vapQ1=props['vapQ']
+				Cp_g1=props['Cp_g']
+				Cp_l1=props['Cp_l']
 			prev['v_g']=vapQ0*massFlow*4/(ID*ID*math.pi*r_g0*(1-hold_up)) if vapQ0>0 else 0
 			prev['v_l']=(1-vapQ0)*massFlow*4/(ID*ID*math.pi*r_l0*hold_up) if hold_up>0 else 0
 			prev['pattern']=pattern
@@ -184,6 +198,7 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 				'Cp_l':Cp_l1,
 				'Cp_g':Cp_g1
 				})
+			print geometry[geo1]['d'],P1,T1,vapQ1
 		counter+=1
 	system.simData['vars']=sim_vars
 	return system

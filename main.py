@@ -12,7 +12,7 @@ sysParams= {
     'P0':2e5,   #Pa abs
     'T0':25,        #deg C
     #'Ql':317.9746,      #sm3/day
-    'm':2,              #kg/s
+    'm':.05,              #kg/s
     'T_amb':4,
     'sysVars':[
         {
@@ -29,17 +29,17 @@ sysParams= {
     ],
     'comp':[
         (21,'oxygen'),
-        (79,'nitrogen'),
+        (79,'octane'),
     ],
-    'PVT':{								#black oil pvt data at wellhead
-        'r_g':1,						#density of gas (kg/m3)
-        'r_l':998.0841,						#density of liquid
-        'm_g':0.0000131,					#viscosity of gas (Pa s)
-        'm_l':0.00109391,						#viscosity of liquid
-        'vapQ':	0.0,			                        #mass vapour quality 
-        'Cp_l':77.76696/0.018,
-        'Cp_g':0.0
-    }
+    # 'PVT':{								#black oil pvt data at wellhead
+    #     'r_g':1,						#density of gas (kg/m3)
+    #     'r_l':998.0841,						#density of liquid
+    #     'm_g':0.0000131,					#viscosity of gas (Pa s)
+    #     'm_l':0.00109391,						#viscosity of liquid
+    #     'vapQ':	0.0,			                        #mass vapour quality
+    #     'Cp_l':77.76696/0.018,
+    #     'Cp_g':0.0
+    # }
 }
 """
 1bpd=1.840130787037037e-06		                	m3/s 
@@ -53,7 +53,7 @@ sys=settings.newSystem(sysParams)
 #sys.printGeometry()
 #sim.simulate(sys,mode='devision',steps=300,devMultiplier=5)
 
-sys,itterations=sim.forward_steady_calculate(sys,VLE='ideal',flow='p_a',tol_P=1)
+sys,itterations=sim.forward_steady_calculate(sys,VLE='pr',flow='p_a',tol_P=10)
 ##sys,itterations=sim.forward_steady_calculate(sys,flow='p_a')
 print itterations
 data_writer.write_summary_file(sys)

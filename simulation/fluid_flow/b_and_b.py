@@ -206,7 +206,7 @@ def calcPressureDrop(P0,m,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
 	f=g_s.calcDWf(roughness,ID,Re)
 	x=lambda_l/math.pow(yl,2)
 
-	if x<1:
+	if 1<x<1.2:
 		S=ln(2.2*x-1.2)
 	else:
 		S=ln(x)/(-0.0523+3.182*ln(x)-0.8725*math.pow(ln(x),2)+0.01853*math.pow(ln(x),4))
