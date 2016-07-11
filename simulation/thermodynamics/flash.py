@@ -59,6 +59,16 @@ class Prep:
             return  sign*(comp_i*(ln(comp_i)+fug_ij[i]-fug_i0)+comp_j*(ln(comp_j)+fug_ij[j]-fug_j0))
         def objective(x,P,T,i,j,get_ideal,sign):
             return func(x, P, T, i, j, sign)-get_ideal(x,sign)
+        for i in pvt:
+            for j in pvt:
+                if not j==i:
+                    print 'x_{%s}&\\frac{\Delta\\bar{G}_{\mathrm{mix}}}{RT}'%i
+                    x=''
+                    for n in range(1,100):
+                        c=n/100.
+                        ans=objective([c,1-c],P,T,i,j,ideal(P,T,i,j),1)
+                        x+=str((c,ans))
+                    print x
         cons = ({'type': 'eq',
                  'fun': lambda x: np.array([1-x[0]-x[1]]),
                  'jac': lambda x: np.array([-1.,-1.])},
@@ -364,9 +374,13 @@ class System:
                     frac_p=x[p]
                     comp_p={index[i]:x[k+n*p+i] for i in range(n)}
                     if vapor and p==k-1:
-                        G_total+=frac_p*self._g_peng_robinson(comp_p,phase='light')
+                        fugij=peng_robinson.fug_minimum_gibbs(pvt,T,P,1,comp=comp_p,phase='light')
+                        # G_total+=frac_p*self._g_peng_robinson(comp_p,phase='light')
+                        G_total+=frac_p*sum([comp_p[i]*(ln(comp_p[i])+fugij[i]) for i in index])
                     else:
-                        G_total+=frac_p*self._g_peng_robinson(comp_p)
+                        fugij = peng_robinson.fug_minimum_gibbs(pvt, T, P, 1, comp=comp_p, phase='heavy')
+                        # G_total+=frac_p*self._g_peng_robinson(comp_p)
+                        G_total += frac_p * sum([comp_p[i] * (ln(comp_p[i]) + fugij[i]) for i in index])
                 return G_total
             def fug_diff(x):
                 x = [c if c > 0 else 1e-18 for c in x]
@@ -400,7 +414,7 @@ class System:
                      'jac': lambda x: np.array([[1. if c1==c2 else 0 for c1 in range(len(x))] for c2 in range(len(x))]
                                                +[[-1. if c1==c2 else 0 for c1 in range(len(x))] for c2 in range(len(x))])},
                     {'type':'eq',
-                     'fun': lambda x: np.array(fug_diff(x))})
+                     'fun': lambda x: np.array([self.pvt[index[i]]['comp']-sum([x[k+i+n*p] for p in range(k)]) for i in range(n)])})
 
             # bounds=[[0.,1.] for c in x0]
             res=minimize(_total_gibbs,x0,method='SLSQP',constraints=cons)
@@ -507,7 +521,6 @@ class System:
             self.split_liquid_phases=None
         #check for vapour
         vapour=self._get_bubble_props()
-        print [i.pvt['methane']['comp'] for i in self.liquid_phases]
         if vapour==None:
             self.phases=[{'type':'liquid','phase':p} for p in self.liquid_phases]
             return False
