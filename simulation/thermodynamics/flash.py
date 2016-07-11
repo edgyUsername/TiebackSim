@@ -282,6 +282,7 @@ class System:
         prep=Prep(pvt,P,T)
         self.pvt=prep.pvt
         self.tangents=prep.tangents
+        print pvt
         self._set_g_pure()
         self.stable=False
         self.split_liquid_phases=None
@@ -347,6 +348,7 @@ class System:
             P=self.P
             T=self.T
             index=[]
+            gas=-1
             for i in pvt:
                 index.append(i)
             if not vapor:
@@ -361,10 +363,14 @@ class System:
                 x0=[l['phase'].moles for l in self.phases]
                 k = len(self.phases)  # number of phases
                 n = len(index)  # number of components
+                c=0
                 for l in self.phases:
+                    if l['type']=='gas':
+                        gas=c
                     pvt_l = l['phase'].pvt
                     for i in index:
                         x0.append(pvt_l[i]['comp'])
+                    c+=1
 
             ########## find gibbs of mixing for each phase
             def _total_gibbs(x):
@@ -373,7 +379,7 @@ class System:
                 for p in range(k):
                     frac_p=x[p]
                     comp_p={index[i]:x[k+n*p+i] for i in range(n)}
-                    if vapor and p==k-1:
+                    if vapor and p==gas:
                         fugij=peng_robinson.fug_minimum_gibbs(pvt,T,P,1,comp=comp_p,phase='light')
                         # G_total+=frac_p*self._g_peng_robinson(comp_p,phase='light')
                         G_total+=frac_p*sum([comp_p[i]*(ln(comp_p[i])+fugij[i]) for i in index])
@@ -403,8 +409,6 @@ class System:
                     fug_eq_list+=fug_diff_list
                 return fug_eq_list
 
-
-
             cons = ({'type': 'eq',
                      'fun': lambda x: np.array([1 - sum([x[l] for l in range(k)])]+[1-sum([x[k+i+n*p] for i in range(n)]) for p in range(k)]),
                      'jac': lambda x: np.array([[(-1. if c in range(k) else 0)for c in range(len(x))]]
@@ -415,6 +419,7 @@ class System:
                                                +[[-1. if c1==c2 else 0 for c1 in range(len(x))] for c2 in range(len(x))])},
                     {'type':'eq',
                      'fun': lambda x: np.array([self.pvt[index[i]]['comp']-sum([x[k+i+n*p] for p in range(k)]) for i in range(n)])})
+
 
             # bounds=[[0.,1.] for c in x0]
             res=minimize(_total_gibbs,x0,method='SLSQP',constraints=cons)
@@ -430,9 +435,11 @@ class System:
                 self.split_liquid_phases=new_phases
             else:
                 self.phases=[{'type':'gas' if p==k-1 else 'liquid','phase':new_phases[p]} for p in range(k)]
+
     def _get_bubble_props(self):
         T=self.T
         P=self.P
+        print T
         pvt=self.pvt.copy()
         liquids=self.liquid_phases
         volatiles=[]
@@ -455,15 +462,15 @@ class System:
                 new_pvt=generate_pvt(l.pvt,volatiles)
                 for i in index:
                     comps.append(new_pvt[i]['comp'])
-            def _get_lnK(T,p,comps_y=None):
+            def _get_lnK(T,comps_y=None):
                 comp_x={}
                 lnK=[]
                 for i in range(len(index)):
-                    comp_x[index[i]] = comps[i + n * p]
+                    comp_x[index[i]] = pvt[index[i]]['comp']
                 if not comps_y==None:
                     comp_y={}
                     for i in range(len(comps_y)):
-                        comp_y[index[i]] = comps_y[i]
+                        comp_y[index[i]] = comps_y[i] if comps_y[i]>1e-18 else 1e-18
                     fug_l=peng_robinson.fug_minimum_gibbs(pvt,T,P,1.,comp=comp_x,phase='heavy')
                     fug_v=peng_robinson.fug_minimum_gibbs(pvt,T,P,1.,comp=comp_y,phase='light')
 
@@ -476,14 +483,14 @@ class System:
                             - peng_robinson.fug_minimum_gibbs({i: pvt_i}, T, P, 1., comp={i: 1.}, phase='light')[i])
                 return lnK
             def func(x):
-                lnK=[_get_lnK(x[-1],p,comps_y=x[:-1]) for p in range(k)]
+                lnK=[_get_lnK(x[-1],comps_y=x[:-1]) for p in range(k)]
                 return sum([sum([(exp(lnK[p][i])*comps[i+n*p]-x[i])**2 for i in range(n)]) for p in range(k)])+(1-sum([x[i] for i in range(n)]))**2
             # initial estimates
             x0=[]
-            lnK_init=_get_lnK(T,0)
+            lnK_init=_get_lnK(T)
             tot=0
             for i in range(len(index)):
-                y_i=math.exp(lnK_init[i])*comps[i]
+                y_i=math.exp(lnK_init[i])*pvt[index[i]]['comp']
                 tot+=y_i
                 x0.append(y_i)
             x0=[i/tot for i in x0]
@@ -500,18 +507,17 @@ class System:
                     return None
             T0=T01 if f1>=.1 else T02
             x0.append(T0)
+            print x0
             bounds=[[0.,1.]for i in index]+[[-273,None]]
             res=minimize(func,x0,method='SLSQP',bounds=bounds)
-            if T<res.x[-1]:
-                return None
-            else:
-                return {'comp':{index[i]:res.x[i] for i in range(len(index))},'T':res.x[-1]}
+            return {'comp':normalize_comps({index[i]:res.x[i] for i in range(len(index))}),'T':res.x[-1]}
     def _equilibriate(self):
+
         while not self.stable:
             self._flash_liquids()
             new_phases=[]
             for p in self.split_liquid_phases:
-                collapse=p.moles<1e-6
+                collapse=p.moles<1e-3
                 if not collapse:
                     new_phases.append(p)
                 else:
@@ -519,22 +525,3 @@ class System:
             if not self.stable:
                 self.liquid_phases=new_phases
             self.split_liquid_phases=None
-        #check for vapour
-        vapour=self._get_bubble_props()
-        if vapour==None:
-            self.phases=[{'type':'liquid','phase':p} for p in self.liquid_phases]
-            return False
-        else:
-            T_bub=vapour['T']
-            v_comp=vapour['comp']
-            volatiles=[i for i in v_comp]
-            pvt_g=generate_pvt(self.pvt,volatiles)
-            for i in v_comp:
-                pvt_g[i]['comp']=v_comp[i]
-            frac_v=min((self.T-T_bub)/(T_bub+273),.99)
-            self.phases = [{'type': 'liquid', 'phase': p} for p in self.liquid_phases]
-            for p in self.phases:
-                p['phase'].moles=p['phase'].moles*(1-frac_v)
-            self.phases+=[{'type':'gas','phase':Phase(pvt_g,self.P,self.T,self.tangents,frac_v)}]
-            self._flash_liquids(vapor=True)
-            return True

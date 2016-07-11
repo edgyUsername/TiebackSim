@@ -1,6 +1,7 @@
 import math
 import peng_robinson
 import numpy as np
+import flash
 from scipy.optimize import minimize_scalar,minimize
 aq_comps=['water','ethanol','methanol','carbondioxide']
 R=8.314
@@ -209,7 +210,26 @@ class Flash():
         self.phases=[{'type':'gas','frac':gas['frac'],'comp':gas['comp']},
                      {'type': 'hc', 'frac': (1-aq_frac)*liq['frac'], 'comp': normalize_comp(hc_comp)},
                      {'type': 'aq', 'frac': aq_frac* liq['frac'], 'comp': normalize_comp(aq_comp)}]
-
+    def _split_liq(self):
+        gas = self.phases[0]
+        liq = self.phases[1]
+        l_pvt=dict(self.pvt.copy())
+        for i in liq['comp']:
+            l_pvt[i]['comp']=liq['comp'][i]
+        print gas['comp'],gas['frac']
+        print liq['comp']
+        print l_pvt,'\n*************************'
+        a=flash.System(l_pvt,self.P,self.T)
+        a._equilibriate()
+        self.phases = [{'type': 'gas', 'frac': gas['frac'], 'comp': gas['comp']}]
+        for p in a.liquid_phases:
+            max_c,max_x='',0
+            for i in p.pvt:
+                if p.pvt[i]['comp']>max_x:
+                    max_c=i
+                    max_x=p.pvt[i]['comp']
+            self.phases.append({'type':('hc' if not  max_c in aq_comps else 'aq'), 'frac':liq['frac']*p.moles, 'comp':{i: p.pvt[i]['comp'] for i in p.pvt}})
+        return
     def equilibriate(self):
         self._split()
         for i in range(3):
@@ -235,5 +255,5 @@ class Flash():
             else:
                 assert False
             error=sum([(i-1)**2 for i in R_new])
-        self._split_aq()
+        self._split_liq()
         return self.phases
