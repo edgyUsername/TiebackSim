@@ -14,6 +14,7 @@ class Phase():
         self.mol_frac=phase['frac']
         self._set_density()
         self._set_Cp()
+        print self.type
         self._set_enthalpy()
         self._set_transport_props()
 
@@ -22,9 +23,7 @@ class Phase():
         # gas
         Z, self.eos_params = peng_robinson.solve_PR_for_Z(pvt, T, P, comp=comp)
         Z = Z[-1]
-
         self.mol_mass = sum([comp[i] * pvt[i]['params']['mm'] for i in comp])
-
         if self.type=='gas':
             self.g_mol_density = P / (Z * R * (T + 273.15))
             self.mol_density=self.g_mol_density
@@ -58,6 +57,7 @@ class Phase():
         h=h_i_g+h_dep
         self.mol_h=h
         self.mass_h=h/self.mol_mass
+        print 'enthalpy at %s= '%T,self.mol_h,self.mass_h
     def _set_transport_props(self):
         # visc in cP and cond in W/(m K)
         if self.type=='gas':
@@ -68,6 +68,7 @@ class Phase():
 class System():
     def __init__(self,pvt,phases,T,P):
         self.pvt=pvt
+        print '___________________________________\n',{i:pvt[i]['comp'] for i in pvt}
         self.T=T
         self.P=P
         self.phases=[Phase(pvt,p,T,P) for p in phases]

@@ -35,7 +35,7 @@ def calcStepIndices(geometry,devs):
 		assert False
 	return stepIndices
 
-def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
+def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8, tol_T=2):
 	#tol_P in Pascals
 	assert type(tol_P)==int or type(tol_P)==float,"pressure convergence must be a number"
 	assert isinstance(system,settings.System),"system must be an instance of the System class"
@@ -67,7 +67,8 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 			'pattern':None,
 			'hold_up':None,
 			'Cp_l':system.pvt['Cp_l'],
-			'Cp_g':system.pvt['Cp_g']
+			'Cp_g':system.pvt['Cp_g'],
+			'enthalpy':None
 			}]
 	elif system.pvtType=='bo' and VLE=='ideal':
 		simData['vars']=[{
@@ -84,7 +85,8 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 			'pattern':None,
 			'hold_up':None,
 			'Cp_l':system.pvt['Cp_l'],
-			'Cp_g':None
+			'Cp_g':None,
+			'enthalpy':None
 			}]
 	elif system.pvtType=='comp' and VLE=='pr':
 		simData['vars'] = [PVT.get_props(system.pvt,system.T_in,system.p_in)]
@@ -98,11 +100,11 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 	else:
 		assert False, 'pvt type error'
 
-	devs=20
 	stepIndices=calcStepIndices(simData['geometry'],devs)
 	geometry=simData['geometry']
 	sim_vars=simData['vars']
 	counter=0
+	print sim_vars[0]
 	for i in stepIndices:
 		if counter==0:
 			pass
@@ -118,7 +120,7 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 			ID=pipe.d-2*thickness
 			L=geometry[geo1]['d']-geometry[geo0]['d']
 			U=pipe.U
-
+			h0=prev['enthalpy']
 			T0=prev['T']
 			r_g0=prev['r_g']
 			r_l0=prev['r_l']
@@ -129,6 +131,7 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 			vapQ0=prev['vapQ']
 			massFlow=system.massFlow
 			P0=prev['P']
+			print '****************************',vapQ0
 			#pressure drop calc
 			if vapQ0 < 1e-3:
 				P1=o_p.calcPressureDrop(P0,massFlow,r_l0,m_l0,z,roughness,ID,L,T0)
@@ -141,7 +144,13 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 			elif flow=='b_b':
 				P1,hold_up,pattern=b_b.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
 			elif flow=='p_a':
-				P1,hold_up,pattern=p_a.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
+				try:
+					P1,hold_up,pattern=p_a.calcPressureDrop(P0,massFlow,vapQ0,r_g0,r_l0,m_g0,m_l0,z,roughness,ID,L,T0)
+				except:
+					print  '<<<<<<<<<<<<<<<<<<<<<'
+					print r_g0,r_l0
+					P1, hold_up, pattern = b_b.calcPressureDrop(P0, massFlow, vapQ0, r_g0, r_l0, m_g0, m_l0, z,
+																roughness, ID, L, T0)
 			else:
 				assert False,'invalid pressure drop method'
 			# print 'P0: %s, P1: %s, T0: %s, L: %s, liq visc: %s, gas visc: %s, vapQ: %s, liq density: %s, gas density: %s' %(P0,P1,T0,L,m_l0,m_g0,vapQ0,r_l0,r_g0)
@@ -153,7 +162,8 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 			if VLE=='incompressible' and system.pvtType=='bo':
 				r_g1=r_g0
 				r_l1=r_l0
-				m_g1=m_g0 
+				m_g1=m_g0
+				h1=None
 				m_l1=m_l0 #water/air experiment
 				#m_l1=glaso.updateLiquidVisc(m_l0,r_l1,T1,T0)
 				vapQ1=vapQ0
@@ -163,6 +173,7 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 				r_g1=r_g0*P1*(T1+273.14)/(P0*(T0+273.14))
 				r_l1=r_l0
 				m_g1=m_g0
+				h1=None
 				m_l1=m_l0 #water/air experiment
 				#m_l1=glaso.updateLiquidVisc(m_l0,r_l1,T1,T0)
 				vapQ1=vapQ0
@@ -177,8 +188,41 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 				vapQ1=props['vapQ']
 				Cp_g1=props['Cp_g']
 				Cp_l1=props['Cp_l']
-			prev['v_g']=vapQ0*massFlow*4/(ID*ID*math.pi*r_g0*(1-hold_up)) if vapQ0>0 else 0
-			prev['v_l']=(1-vapQ0)*massFlow*4/(ID*ID*math.pi*r_l0*hold_up) if hold_up>0 else 0
+				h1=props['enthalpy']
+
+				# T_new=ambient_heat_transfer.minimize_q(ID+2*thickness,L,massFlow,.5*(Cp_l0+Cp_l1),0.5*(Cp_g1+Cp_g0),0.5*(vapQ0+vapQ1),T0,T1,T_out,U,h1,h0)
+				T_new = ambient_heat_transfer.calculate_T(ID + 2 * thickness, L, massFlow, .5 * (Cp_l0 + Cp_l1),
+														  0.5 * (Cp_g1 + Cp_g0), 0.5 * (vapQ0 + vapQ1), T0, T_out, U)
+
+				T_error=T_new-T1
+				T1=T_new
+				while T_error>tol_T:
+					props = PVT.get_props(system.pvt, T1, P1)
+					r_g1 = props['r_g']
+					r_l1 = props['r_l']
+					m_g1 = props['m_g']
+					m_l1 = props['m_l']
+					vapQ1 = props['vapQ']
+					Cp_g1 = props['Cp_g']
+					Cp_l1 = props['Cp_l']
+					h1 = props['enthalpy']
+
+					# T_new=ambient_heat_transfer.minimize_q(ID+2*thickness,L,massFlow,.5*(Cp_l0+Cp_l1),0.5*(Cp_g1+Cp_g0),0.5*(vapQ0+vapQ1),T0,T1,T_out,U,h1,h0)
+					T_new=ambient_heat_transfer.calculate_T(ID+2*thickness,L,massFlow,.5*(Cp_l0+Cp_l1),0.5*(Cp_g1+Cp_g0),0.5*(vapQ0+vapQ1),T0,T_out,U)
+					T_error = T_new - T1
+
+					T1=T_new
+			prev['v_g'] = vapQ0 * massFlow * 4 / (ID * ID * math.pi * r_g0 * (1 - hold_up)) if hold_up < 1 else 0
+			prev['v_l'] = (1 - vapQ0) * massFlow * 4 / (ID * ID * math.pi * r_l0 * hold_up) if hold_up > 0 else 0
+			if flow in ['p_a','b_b']:
+				try:
+					prev2 = sim_vars[-2]
+					print prev2
+				except:
+					print 'Fail'
+					pass
+				else:
+					P1-=(r_g1*prev['v_g']**2-r_g0*prev2['v_g']**2)*.5
 			prev['pattern']=pattern
 			prev['hold_up']=hold_up
 			sim_vars[-1]=prev
@@ -189,6 +233,7 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 				'v_g':None,
 				'v_l':None,
 				'vapQ':vapQ1,
+				'enthalpy':h1,
 				'r_g':r_g1,
 				'r_l':r_l1,
 				'm_g':m_g1,
@@ -203,7 +248,7 @@ def forward_steady_itterate(system, tol_P=10,flow='b_b',VLE='ideal',devs=8):
 	system.simData['vars']=sim_vars
 	return system
 
-def forward_steady_calculate(system, tol_P=10,flow='b_b',VLE='ideal'):
+def forward_steady_calculate(system, tol_P=10,flow='b_b',VLE='ideal',tol_T=1):
 	system=forward_steady_itterate(system,tol_P=tol_P,flow=flow,VLE=VLE)
 	P_out=system.simData['vars'][-1]['P']
 	error=tol_P*2
@@ -211,10 +256,11 @@ def forward_steady_calculate(system, tol_P=10,flow='b_b',VLE='ideal'):
 	devs=32
 	while error>tol_P:
 		print P_out
-		system=forward_steady_itterate(system,tol_P=tol_P,flow=flow,VLE=VLE,devs=devs)
+		system=forward_steady_itterate(system,tol_P=tol_P,flow=flow,VLE=VLE,devs=devs,tol_T=tol_T)
 		P_out_new=system.simData['vars'][-1]['P']
 		error=abs(P_out_new-P_out)
 		P_out=P_out_new
 		devs=devs*2
 		it_counter+=1
+	system.transSimData=[{'t':0,'simData':system.simData}]
 	return (system,it_counter)

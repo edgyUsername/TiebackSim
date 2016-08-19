@@ -72,10 +72,11 @@ def all_crit_properties():
                                                    'h': lambda c,T: (T-25)*(sum([c[i]*(T+273.15)**i for i in range(5)])+sum([c[i]*(25+273.15)**i for i in range(5)]))/2}
     return properties
 
-def get_props_and_equalize(compData):
+def get_props_and_equalize(compData,wc=None):
     """compData is list with tuples (feed comp, comp name)"""
     ref=all_crit_properties()
     total_moles=0
+    tot_mass=0
     for i in compData:
         total_moles+=float(i[0])
     pvtParams={}
@@ -88,9 +89,21 @@ def get_props_and_equalize(compData):
         if compParams['_id'] in pvtParams:
             assert False, "components must be unique!"
         pvtParams[compParams['_id']]={'params':compParams,'comp':float(i[0])/total_moles}
+        tot_mass+=float(i[0])*compParams['mm']/total_moles
+    if wc!=None:
+        params=ref['water']
+        if not wc==1:
+            a=(tot_mass)*wc/((1-wc)*0.018)
+            wcm=a/(1+a)
+        else:
+            wcm=1
+        for i in pvtParams:
+            pvtParams[i]['comp']=pvtParams[i]['comp']*(1-wcm)
+        pvtParams['water'] = {'params': params, 'comp': wcm}
+
     for i in pvtParams:
         pvtParams[i]['k'] = {j: 0 for j in pvtParams}
-        pvtParams[i]['params']['t_b']=get_bp(pvtParams[i])
+        # pvtParams[i]['params']['t_b']=get_bp(pvtParams[i])
     return pvtParams
 
 def get_bp(pvt_i):

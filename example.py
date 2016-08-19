@@ -1,6 +1,3 @@
-import sys
-from os import path
-sys.path.append(path.dirname( path.abspath(__file__)) ) 
 import settings
 import data_writer
 from simulation import simulator as sim
@@ -57,32 +54,15 @@ sysParams= {
         # (.013,'hydrogen'),
         # (4.55,'nitrogen'),
         # (78.03,'carbondioxide'),
-    ],
-    # 'fractions':{
-    #     'C7+':{
-    #         'comp':51.54,
-    #         'mm':115,
-    #         't_b':101.1,
-    #         'sg':.683
-    #     }
-    # }
-    # 'PVT':{								#black oil pvt data at wellhead
-    #     'r_g':1,						#density of gas (kg/m3)
-    #     'r_l':998.0841,						#density of liquid
-    #     'm_g':0.0000131,					#viscosity of gas (Pa s)
-    #     'm_l':0.00109391,						#viscosity of liquid
-    #     'vapQ':	0.0,			                        #mass vapour quality
-    #     'Cp_l':77.76696/0.018,
-    #     'Cp_g':0.0
-    # }
+    ]
 }
-"""
+"""############### Unit Conversions #####################
 1bpd=1.840130787037037e-06		                	m3/s 
 1scfd=3.2774128000000003e-07		                m3/s
 1 lb/ft3=16.018					                  	kg/m3
 1"=0.0254			    		                  	m
 1psi=6894.757						                Pa
-"""
+######################################################"""
 sys=settings.newSystem(sysParams)
 
 sys=sim.forward_steady_itterate(sys,VLE='pr',flow='p_a',tol_P=1,devs=1000)

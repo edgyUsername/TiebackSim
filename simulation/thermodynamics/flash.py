@@ -51,6 +51,8 @@ class Prep:
             return find_ideal
         def func(x,P,T,i,j,sign):
             comp_i,comp_j=x
+            comp_i=max(1e-8,comp_i)
+            comp_j = max(1e-8, comp_j)
             P0, T0 = 1e5, 25
             pvt_ij = {i: {'params': pvt[i]['params'].copy(), 'comp': comp_i, 'k':pvt[i]['k']}, j: {'params': pvt[j]['params'].copy(), 'comp': comp_j, 'k':pvt[j]['k']}}
             fug_ij= peng_robinson.fug_minimum_gibbs(pvt_ij,T, P, 1, phase='heavy')
@@ -59,16 +61,7 @@ class Prep:
             return  sign*(comp_i*(ln(comp_i)+fug_ij[i]-fug_i0)+comp_j*(ln(comp_j)+fug_ij[j]-fug_j0))
         def objective(x,P,T,i,j,get_ideal,sign):
             return func(x, P, T, i, j, sign)-get_ideal(x,sign)
-        for i in pvt:
-            for j in pvt:
-                if not j==i:
-                    print 'x_{%s}&\\frac{\Delta\\bar{G}_{\mathrm{mix}}}{RT}'%i
-                    x=''
-                    for n in range(1,100):
-                        c=n/100.
-                        ans=objective([c,1-c],P,T,i,j,ideal(P,T,i,j),1)
-                        x+=str((c,ans))
-                    print x
+
         cons = ({'type': 'eq',
                  'fun': lambda x: np.array([1-x[0]-x[1]]),
                  'jac': lambda x: np.array([-1.,-1.])},
@@ -217,6 +210,7 @@ class Phase:
                     r_1[i] = (1-D1)/((1-D1)+(1-D2)/(1-D1))
                     r_2[i] = (1-D2)/((1-D2)+(1-D1)/(1-D2))
 
+
         return (r_1,r_2)
     def split_init(self):
         pvt=self.pvt
@@ -282,8 +276,6 @@ class System:
         prep=Prep(pvt,P,T)
         self.pvt=prep.pvt
         self.tangents=prep.tangents
-        print pvt
-        self._set_g_pure()
         self.stable=False
         self.split_liquid_phases=None
         self.liquid_phases=[Phase(self.pvt.copy(),P,T,self.tangents,1.)]
@@ -307,32 +299,6 @@ class System:
         _make_new_phases(self)
         stable=len(self.liquid_phases)==len(self.split_liquid_phases)
         return stable
-    def _set_g_pure(self):
-        g_pure_i = {'heavy': {}, 'light': {}}
-        T = self.T + 273.15
-        P = self.P
-        pvt = self.pvt
-        for i in pvt:
-            z_i_roots, eos_params = peng_robinson.solve_PR_for_Z(generate_pvt(pvt, [i]), (T - 273.15), P,comp={i: 1.})
-            v_heavy = z_i_roots[0] * R * T / P
-            v_light = z_i_roots[-1] * R * T / P
-            a, b = eos_params['comp_params'][i]['a_i'], eos_params['comp_params'][i]['b_i']
-            g_pure_i['heavy'][i]=P * v_heavy / (R * T) + ln(R * T / (v_heavy - b)) + (a / (R * T * b * (8 ** .5)))* ln(
-                (2 * v_heavy + 2 * b - b * (8 ** .5)) / (2 * v_heavy + 2 * b + b * (8 ** .5)))
-            g_pure_i['light'][i]=P * v_light / (R * T) + ln(R * T / (v_light - b)) + (a / (R * T * b * (8 ** .5)))* ln(
-                (2 * v_light + 2 * b - b * (8 ** .5)) / (2 * v_light + 2 * b + b * (8 ** .5)))
-        self.g_pure=g_pure_i
-    def _g_peng_robinson(self, comp, phase='heavy'):
-        T, P, pvt,g_pure= self.T, self.P, self.pvt,self.g_pure
-        index=[i for i in comp]
-        n=len(index)
-        Z_roots, eos_params = peng_robinson.solve_PR_for_Z(pvt, T, P, comp={index[i]: comp[index[i]] for i in range(n)})
-        v = Z_roots[-1] * R * (T + 273.15) / P if phase == 'light' else Z_roots[0] * R * (T + 273.15) / P
-        a, b = eos_params['a_m'], eos_params['b_m']
-        T = T + 273.15
-        return P * v / (R * T) + ln(R * T / (v - b)) + (a / (R * T * b * (8 ** .5))) * ln(
-            (2 * 2 * b - b * (8 ** .5)) / (2 * v + 2 * b + b * (8 ** .5))) \
-               + sum([comp[index[j]] * ln(comp[index[j]]) for j in range(n)]) - sum([comp[index[j]] * g_pure[phase][index[j]] for j in range(n)])
 
     def _flash_liquids(self,vapor=False):
         """updates phases in system  by checking current phases for stability and splitting unstable liquid phases"""
@@ -342,104 +308,106 @@ class System:
             stable=False
         if stable:
             self.stable=True
-        else: # continues to minimize gibbs if not all stable liquid phases are found
-
-            pvt=self.pvt
-            P=self.P
-            T=self.T
-            index=[]
-            gas=-1
-            for i in pvt:
-                index.append(i)
-            if not vapor:
-                x0=[l.moles for l in self.split_liquid_phases] #l1,l2,...,lk,x1l1,x2l1...xnl1...xnlk
-                k=len(self.split_liquid_phases) # number of phases
-                n=len(index) # number of components
-                for l in self.split_liquid_phases:
-                    pvt_l=l.pvt
-                    for i in index:
-                        x0.append(pvt_l[i]['comp'])
-            else:
-                x0=[l['phase'].moles for l in self.phases]
-                k = len(self.phases)  # number of phases
-                n = len(index)  # number of components
-                c=0
-                for l in self.phases:
-                    if l['type']=='gas':
-                        gas=c
-                    pvt_l = l['phase'].pvt
-                    for i in index:
-                        x0.append(pvt_l[i]['comp'])
-                    c+=1
-
-            ########## find gibbs of mixing for each phase
-            def _total_gibbs(x):
-                x=[c if c>0 else 1e-19 for c in x]
-                G_total=0
-                for p in range(k):
-                    frac_p=x[p]
-                    comp_p={index[i]:x[k+n*p+i] for i in range(n)}
-                    if vapor and p==gas:
-                        fugij=peng_robinson.fug_minimum_gibbs(pvt,T,P,1,comp=comp_p,phase='light')
-                        # G_total+=frac_p*self._g_peng_robinson(comp_p,phase='light')
-                        G_total+=frac_p*sum([comp_p[i]*(ln(comp_p[i])+fugij[i]) for i in index])
-                    else:
-                        fugij = peng_robinson.fug_minimum_gibbs(pvt, T, P, 1, comp=comp_p, phase='heavy')
-                        # G_total+=frac_p*self._g_peng_robinson(comp_p)
-                        G_total += frac_p * sum([comp_p[i] * (ln(comp_p[i]) + fugij[i]) for i in index])
-                return G_total
-            def fug_diff(x):
-                x = [c if c > 0 else 1e-18 for c in x]
-                fug_eq_list=[]
-                fug_p=[]
-                comp_p=[]
-                for p in range(k):
-                    comp_p.append({index[j]:x[k+n*p+j] for j in range(n)})
-                    if vapor and p==k-1:
-                        fug_p.append(peng_robinson.fug_minimum_gibbs(pvt,T,P,1.,comp=comp_p[p],phase='light'))
-                    else:
-                        fug_p.append(peng_robinson.fug_minimum_gibbs(pvt, T, P, 1., comp=comp_p[p], phase='heavy'))
-                for i in range(n):
-                    fug_i = []
-                    fug_diff_list = []
-                    for p in range(k):
-                        fug_i.append(ln(comp_p[p][index[i]])+fug_p[p][index[i]])
-                    for p in range(k-1):
-                        fug_diff_list.append(fug_i[p]-fug_i[p+1])
-                    fug_eq_list+=fug_diff_list
-                return fug_eq_list
-
-            cons = ({'type': 'eq',
-                     'fun': lambda x: np.array([1 - sum([x[l] for l in range(k)])]+[1-sum([x[k+i+n*p] for i in range(n)]) for p in range(k)]),
-                     'jac': lambda x: np.array([[(-1. if c in range(k) else 0)for c in range(len(x))]]
-                                               +[[(-1. if c in range(k+n*p,k+n*(p+1)) else 0) for c in range(len(x))]for p in range(k)])},
-                    {'type': 'ineq',
-                     'fun': lambda x: np.array([c for c in x]+[1-c for c in x]),
-                     'jac': lambda x: np.array([[1. if c1==c2 else 0 for c1 in range(len(x))] for c2 in range(len(x))]
-                                               +[[-1. if c1==c2 else 0 for c1 in range(len(x))] for c2 in range(len(x))])},
-                    {'type':'eq',
-                     'fun': lambda x: np.array([self.pvt[index[i]]['comp']-sum([x[k+i+n*p] for p in range(k)]) for i in range(n)])})
-
-
-            # bounds=[[0.,1.] for c in x0]
-            res=minimize(_total_gibbs,x0,method='SLSQP',constraints=cons)
-            # parse results from minimizer
-            new_phases=[]
-            for p in range(k):
-                fraction=res.x[p]
-                pvt_k=generate_pvt(pvt,[i for i in index])
-                for i in range(n):
-                    pvt_k[index[i]]['comp']=res.x[(k-1)+(i+1)+n*p]
-                new_phases.append(Phase(pvt_k,P,T,self.tangents,fraction))
-            if not vapor:
-                self.split_liquid_phases=new_phases
-            else:
-                self.phases=[{'type':'gas' if p==k-1 else 'liquid','phase':new_phases[p]} for p in range(k)]
+        # else: # continues to minimize gibbs if not all stable liquid phases are found
+        #
+        #     pvt=self.pvt
+        #     P=self.P
+        #     T=self.T
+        #     index=[]
+        #     gas=-1
+        #     for i in pvt:
+        #         index.append(i)
+        #     if not vapor:
+        #         x0=[l.moles for l in self.split_liquid_phases] #l1,l2,...,lk,x1l1,x2l1...xnl1...xnlk
+        #         k=len(self.split_liquid_phases) # number of phases
+        #         n=len(index) # number of components
+        #         for l in self.split_liquid_phases:
+        #             pvt_l=l.pvt
+        #             for i in index:
+        #                 x0.append(pvt_l[i]['comp'])
+        #     else:
+        #         x0=[l['phase'].moles for l in self.phases]
+        #         k = len(self.phases)  # number of phases
+        #         n = len(index)  # number of components
+        #         c=0
+        #         for l in self.phases:
+        #             if l['type']=='gas':
+        #                 gas=c
+        #             pvt_l = l['phase'].pvt
+        #             for i in index:
+        #                 x0.append(pvt_l[i]['comp'])
+        #             c+=1
+        #
+        #     ########## find gibbs of mixing for each phase
+        #     def _total_gibbs(x):
+        #         x=[c if c>0 else 1e-19 for c in x]
+        #         G_total=0
+        #         for p in range(k):
+        #             frac_p=x[p]
+        #             comp_p={index[i]:x[k+n*p+i] for i in range(n)}
+        #             if vapor and p==gas:
+        #                 fugij=peng_robinson.fug_minimum_gibbs(pvt,T,P,1,comp=comp_p,phase='light')
+        #                 # G_total+=frac_p*self._g_peng_robinson(comp_p,phase='light')
+        #                 G_total+=frac_p*sum([comp_p[i]*(ln(comp_p[i])+fugij[i]) for i in index])
+        #             else:
+        #                 fugij = peng_robinson.fug_minimum_gibbs(pvt, T, P, 1, comp=comp_p, phase='heavy')
+        #                 # G_total+=frac_p*self._g_peng_robinson(comp_p)
+        #                 G_total += frac_p * sum([comp_p[i] * (ln(comp_p[i]) + fugij[i]) for i in index])
+        #         return G_total
+        #     def fug_diff(x):
+        #         x = [c if c > 0 else 1e-18 for c in x]
+        #         fug_eq_list=[]
+        #         fug_p=[]
+        #         comp_p=[]
+        #         for p in range(k):
+        #             comp_p.append({index[j]:x[k+n*p+j] for j in range(n)})
+        #             if vapor and p==k-1:
+        #                 fug_p.append(peng_robinson.fug_minimum_gibbs(pvt,T,P,1.,comp=comp_p[p],phase='light'))
+        #             else:
+        #                 fug_p.append(peng_robinson.fug_minimum_gibbs(pvt, T, P, 1., comp=comp_p[p], phase='heavy'))
+        #         for i in range(n):
+        #             fug_i = []
+        #             fug_diff_list = []
+        #             for p in range(k):
+        #                 fug_i.append(ln(comp_p[p][index[i]])+fug_p[p][index[i]])
+        #             for p in range(k-1):
+        #                 fug_diff_list.append(fug_i[p]-fug_i[p+1])
+        #             fug_eq_list+=fug_diff_list
+        #         return fug_eq_list
+        #
+        #     cons = ({'type': 'eq',
+        #              'fun': lambda x: np.array([1 - sum([x[l] for l in range(k)])]+[1-sum([x[k+i+n*p] for i in range(n)]) for p in range(k)]),
+        #              'jac': lambda x: np.array([[(-1. if c in range(k) else 0)for c in range(len(x))]]
+        #                                        +[[(-1. if c in range(k+n*p,k+n*(p+1)) else 0) for c in range(len(x))]for p in range(k)])},
+        #             {'type': 'ineq',
+        #              'fun': lambda x: np.array([c for c in x]+[1-c for c in x]),
+        #              'jac': lambda x: np.array([[1. if c1==c2 else 0 for c1 in range(len(x))] for c2 in range(len(x))]
+        #                                        +[[-1. if c1==c2 else 0 for c1 in range(len(x))] for c2 in range(len(x))])},
+        #             {'type':'eq',
+        #              'fun': lambda x: np.array([self.pvt[index[i]]['comp']-sum([x[k+i+n*p] for p in range(k)]) for i in range(n)])})
+        #
+        #
+        #     # bounds=[[0.,1.] for c in x0]
+        #     res=minimize(_total_gibbs,x0,method='SLSQP',constraints=cons)
+        #     # parse results from minimizer
+        #     new_phases=[]
+        #     for p in range(k):
+        #         fraction=res.x[p]
+        #         pvt_k=generate_pvt(pvt,[i for i in index])
+        #         xp=res.x[k+n*p:k+n*(p+1)] if not p==k-1 else res.x[k+n*p:]
+        #         xp=[i if i>1e-8 else 1e-8 for i in xp]
+        #         xp=[i/sum(xp) for i in xp]
+        #         for i in range(n):
+        #             pvt_k[index[i]]['comp']=xp[i]
+        #         new_phases.append(Phase(pvt_k,P,T,self.tangents,fraction))
+        #     if not vapor:
+        #         self.split_liquid_phases=new_phases
+        #     else:
+        #         self.phases=[{'type':'gas' if p==k-1 else 'liquid','phase':new_phases[p]} for p in range(k)]
 
     def _get_bubble_props(self):
         T=self.T
         P=self.P
-        print T
         pvt=self.pvt.copy()
         liquids=self.liquid_phases
         volatiles=[]
@@ -507,7 +475,6 @@ class System:
                     return None
             T0=T01 if f1>=.1 else T02
             x0.append(T0)
-            print x0
             bounds=[[0.,1.]for i in index]+[[-273,None]]
             res=minimize(func,x0,method='SLSQP',bounds=bounds)
             return {'comp':normalize_comps({index[i]:res.x[i] for i in range(len(index))}),'T':res.x[-1]}

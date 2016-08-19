@@ -47,11 +47,17 @@ def estimateSigma (r_l,T,P):
 		T_F=68
 	elif T_F>100:
 		T_F=100
+	print r_l
 	sg=r_l/999.016
 	API=141.5/sg-131.5
+	print '############# API ##############'
+	print '              ',API
 	sigma68=39-0.2571*API
 	sigma100=37.5-0.2571*API
+	print '              ',sigma68,sigma100
 	sigma=sigma68-(T_F-68)*(sigma68-sigma100)/32
+	print'              ',sigma
+	print '################################'
 	p=P/6894.757
 	sigma=sigma*math.exp(-8.6306e-4*p)
 	return sigma/1000
@@ -84,7 +90,7 @@ def calcPressureDrop(P0,m,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
 		regime='distributed'
 	else:
 		assert False
-	theta=math.asin(z/L)
+	theta=math.asin(max(min(z/L,1),-1))
 	sigma=estimateSigma(r_l,T,P0)
 	nVl=v_sl*math.pow(r_l/(9.81*sigma*0.001),0.25)
 	if regime=='segregated':
@@ -213,10 +219,10 @@ def calcPressureDrop(P0,m,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
 	f_tp=f*math.exp(S)
 	dp_f=0.5*f_tp*math.pow(v_m,2)*r_m*L/ID
 	####Ek####
-	Ek=v_m*v_sg*r_m/P0
+	# Ek=v_m*v_sg*r_m/P0
 	####Total pressure drop####
-	dP_total=(dp_f+dp_PE)/(1-Ek)
-
+	# dP_total=(dp_f+dp_PE)/(1-Ek)
+	dP_total = (dp_f + dp_PE)
 	return (P0-dP_total,yl,regime)
 
 

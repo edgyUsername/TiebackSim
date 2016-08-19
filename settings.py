@@ -1,9 +1,11 @@
 import math
-import sys
-from os import path
-sys.path.append(path.dirname(path.abspath(__file__)))
+import simulation.thermodynamics.PVT as PVT
 from simulation.thermodynamics import setup_comp_data as configPVT
-
+ln=math.log
+log=math.log10
+exp=math.exp
+atan=math.atan
+sqrt=math.sqrt
 class Pipe:
 	def __init__(self, length, diameter, roughness, thickness, inclination, U):
 		assert type(length)==float or type(length)==int, "The length of the pipe must be a float or integar"
@@ -66,7 +68,7 @@ class System:
 				{'index':None,'x':None,'y':None,'d':None}
 			]
 		}#t is time; x is x coord;y is y coord; d is distance; i is index of pipe; T is temp; P iss pressure; v is velocity; vap Q is mass vap quality; r is density
-		self.transSimData=[{'t':None,'vars':{}}]
+		self.transSimData=[{'t':0,'simData':{}}]
 		self.pvtType=pvtType 
 		self.pvt=PVT
 		self.p_in=p_in
@@ -185,9 +187,44 @@ def newSystem(systemData):
 	pvtType=None
 	if 'comp' in keys:
 		pvtType='comp'
-		pvt=configPVT.get_props_and_equalize(systemData['comp'])
+		pvt=configPVT.get_props_and_equalize(systemData['comp'],wc=systemData['water_cut'])
+
+		fractions=systemData.get('fractions',{})
+		comp_tot=sum([i[0] for i in systemData['comp']])
+		for f in fractions:
+			x=fractions[f]['comp']/comp_tot
+			name=f
+			v_c=0.3456+2.4224e-4*fractions[f]['mm']-.4443*fractions[f]['sg']+1.131e-3*fractions[f]['mm']*fractions[f]['sg']
+			t_c=338+202*log(fractions[f]['mm']-71.2)+(1361*log(fractions[f]['mm'])-2111)*log(fractions[f]['sg'])
+			p_c=81.91-29.7*log(fractions[f]['mm']-61.1)+(fractions[f]['sg']-.8)*(159.9-58.7*log(fractions[f]['mm']-53.7))
+			P_vap=exp(ln(p_c/1.01325)*(fractions[f]['t_b']/(t_c-fractions[f]['t_b']))*(1-1/.7))
+			hf=-0.15600003121561404*fractions[f]['mm']-208732.21599644143
+			k={j:0 for j in pvt}
+			for j in pvt:
+				pvt[j]['k'][name]=0
+				k[name]=0
+			Kw=((1.8*fractions[f]['t_b'])**(1/3.))/fractions[f]['sg']
+			a=1.4651+.2302*Kw
+			b=.306469-.16734*fractions[f]['sg']
+			c=.001467-.000551*fractions[f]['sg']
+			acc=-log(P_vap)-1.
+			C_l=lambda C,T,t_c: a*(b+c*(T+273.15))
+			h_l=lambda C,T,t_c: a*(b*(T+273.15)+c*((T+273.15)**2)/2)-a*(b*(298)+c*((298)**2)/2)
+			C_ig=lambda C,T: a*(b+c*(T+273.15))-8.314*(1.586+.49/(1-(T+273.15)/t_c)+acc*(4.2775+(6.3/((1-(T+273.15)/t_c)*(T+273.15)/t_c))*abs(1-(T+273.15)/t_c)**(1+1/3.)+.4355/(1-(T+273.15)/t_c)))
+			h_ig= lambda C,T: (a*(b+c*(T+273.15))-8.314*(1.586+.49/(1-(T+273.15)/t_c)+acc*(4.2775+(6.3/((1-(T+273.15)/t_c)*(T+273.15)/t_c))*abs(1-(T+273.15)/t_c)**(1+1/3.)+.4355/(1-(T+273.15)/t_c)))-
+							   a*(b+c*(298))-8.314*(1.586+.49/(1-(298)/t_c)+acc*(4.2775+(6.3/((1-(298)/t_c)*(298)/t_c))*abs(1-(298)/t_c)**(1+1/3.)+.4355/(1-(298)/t_c))))
+			pvt[name]={'comp':x,'k':k,'params':{'_id':name,'heat_l':{'h':h_l,'C':C_l},'heat_g':{'h':h_ig,'C':C_ig},'v_c':v_c,
+					   'p_c':p_c,'t_c':t_c,'cl':[],'cg':[],'acc':acc,'hf':hf,'mm':fractions[f]['mm']/1e3}}
+		comp_tot=sum([pvt[i]['comp'] for i in pvt])
+		for i in pvt:
+			pvt[i]['comp']=pvt[i]['comp']/comp_tot
 		if 'm' in keys:
 			m=systemData['m']
+		else:
+			data_l=PVT.get_props(pvt,systemData['T0'],systemData['P0'])
+			density=data_l['r_l']
+			liqQ = 1-data_l['vapQ']
+			m=systemData['Ql']*density/(liqQ*3600*24)
 		
 	elif 'PVT' in keys:
 		pvt=systemData['PVT']

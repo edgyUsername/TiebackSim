@@ -2,6 +2,7 @@ import math
 import peng_robinson
 import numpy as np
 import flash
+import copy
 from scipy.optimize import minimize_scalar,minimize
 aq_comps=['water','ethanol','methanol','carbondioxide']
 R=8.314
@@ -23,15 +24,17 @@ def generate_pvt(pvt,components):
         pvt_i['comp']=pvt_i['comp']/total_moles
         new_pvt[i]=pvt_i
     return new_pvt
-def normalize_comp(comp):
+def normalize_comp(comp,pvt=None):
     tot=sum([comp[i] for i in comp])
+    if tot==0:
+        tot=sum([pvt[i]['comp'] for i in comp])
     return {i: comp[i]/tot for i in comp}
 
 
 class Flash():
 
     def __init__(self,pvt,T,P):
-        self.pvt=pvt
+        self.pvt=dict(pvt.copy())
         self.T=T
         self.P=P
         self.phases=[]
@@ -39,15 +42,18 @@ class Flash():
 
     def _split(self):
         lnK=peng_robinson.get_wilson_lnK(self.pvt,self.T,self.P)
-        V,comp_v,comp_l=peng_robinson.find_vapor_frcn(self.pvt,lnK)
+        V,comp_v,comp_l=peng_robinson.find_vapor_frcn(self.pvt.copy(),lnK)
         self.phases=[{'frac':V,'comp':comp_v},{'frac':1-V,'comp':comp_l}]
     def _successive_sub(self):
+        T,P=self.T,self.P
         fug_v=peng_robinson.fug_minimum_gibbs(self.pvt,self.T,self.P,1.,comp=normalize_comp(self.phases[0]['comp']),phase='light')
         fug_l=peng_robinson.fug_minimum_gibbs(self.pvt,self.T,self.P,1.,comp=normalize_comp(self.phases[1]['comp']),phase='heavy')
-        lnK={i:fug_l[i]-fug_v[i] for i in self.pvt}
-        V,comp_v,comp_l=peng_robinson.find_vapor_frcn(self.pvt,lnK)
+        lnK={i:ln(exp(fug_l[i])/exp(fug_v[i])) for i in self.pvt}
+        V,comp_v,comp_l=peng_robinson.find_vapor_frcn(self.pvt.copy(),lnK)
+        comp_l=normalize_comp(comp_l)
+        comp_v=normalize_comp(comp_v)
         self.phases=[{'frac':V,'comp':comp_v},{'frac':1-V,'comp':comp_l}]
-        return ([(exp(fug_l[i])*comp_l[i]/(exp(fug_v[i])*comp_v[i])) for i in self.index],lnK)
+        return ([(exp(fug_l[i]-fug_v[i])*comp_l[i]/comp_v[i]) for i in self.index],lnK)
 
     def _a_successive_sub(self,R_old,K_old):
         fug_v = peng_robinson.fug_minimum_gibbs(self.pvt, self.T, self.P, 1., comp=self.phases[0]['comp'],
@@ -184,15 +190,12 @@ class Flash():
     def _split_liq(self):
         gas = self.phases[0]
         liq = self.phases[1]
-        l_pvt=dict(self.pvt.copy())
+        l_pvt=copy.deepcopy(self.pvt)
         for i in liq['comp']:
             l_pvt[i]['comp']=liq['comp'][i]
-        print gas['comp'],gas['frac']
-        print liq['comp']
-        print l_pvt,'\n*************************'
         a=flash.System(l_pvt,self.P,self.T)
         a._equilibriate()
-        self.phases = [{'type': 'gas', 'frac': gas['frac'], 'comp': gas['comp']}]
+        self.phases = [{'type': 'gas', 'frac': gas['frac'], 'comp': normalize_comp(gas['comp'])}]
         for p in a.liquid_phases:
             max_c,max_x='',0
             for i in p.pvt:
@@ -208,7 +211,9 @@ class Flash():
         tol=1e-8
         error=tol+1
         method='ssm'
-        while error>tol:
+        c=0
+        pvt=self.pvt
+        while error>tol and c<20:
             if method=='ssm':
                 R_new,K_new=self._successive_sub()
                 frac_new=self.phases[0]['frac']
@@ -225,5 +230,18 @@ class Flash():
             else:
                 assert False
             error=sum([(i-1)**2 for i in R_new])
-        self._split_liq()
+            c+=1
+        if self.phases[0]['frac']==1:
+            Z=peng_robinson.solve_PR_for_Z(self.pvt,self.T,self.P)
+            if len(Z)==1:
+                self.phases.reverse()
+        self.phases[0]['type']='gas'
+        for p in self.phases:
+            max_c, max_x = '', 0
+            for i in p['comp']:
+                if p['comp'][i] > max_x:
+                    max_c = i
+                    max_x = p['comp'][i]
+        self.phases[1]['type']=('hc' if not  max_c in aq_comps else 'aq')
+        # self._split_liq()
         return self.phases

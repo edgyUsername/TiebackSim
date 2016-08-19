@@ -1,5 +1,5 @@
 import math
-
+from scipy.optimize import minimize_scalar
 def ln(x):
 	if abs(x)>1e-15:
 		return math.log(x)
@@ -14,55 +14,67 @@ def rachford_rice_g(vapour_frcn,pvt,K):
 	#molar fracn
 	g=0
 	for i in pvt:
+
 		try:
 			z,K_i=pvt[i]['comp'],math.exp(K[i])
 		except OverflowError:
 			z,K_i=pvt[i]['comp'],1e15
+			print 'overflow error'
 		try:
 			g+=z*(K_i-1)/(1- vapour_frcn*(1- K_i))
 		except ZeroDivisionError:
 			g+=1e15
+			print 'ZeroDivision error'
 	return g
+# def find_vapor_frcn(pvt,K):
+# 	print'K: ', K
+# 	g_0=rachford_rice_g(0,pvt,K)
+# 	comp_v={}
+# 	comp_l={}
+# 	V=-1
+# 	if g_0<=0:	#bubble point
+# 		V=0.0
+# 		for i in pvt:
+# 			comp_v[i]=pvt[i]['comp']*math.exp(K[i])
+# 			comp_l[i]=pvt[i]['comp']
+# 	else:
+# 		g_1=rachford_rice_g(1,pvt,K)
+# 		if g_1>=0: #dew point
+# 			V=1.0
+# 			for i in pvt:
+# 				comp_v[i]=pvt[i]['comp']
+# 				comp_l[i]=pvt[i]['comp']/math.exp(K[i])
+# 	if V==-1:
+# 		tol=0.00001
+# 		e=tol+1
+# 		Va=0.0
+# 		ga=g_0
+# 		Vb=1.0
+# 		gb=g_1
+# 		itc=0
+# 		while e>tol:
+# 			Vc=(Va+Vb)/2
+# 			gc=rachford_rice_g(Vc,pvt,K)
+# 			if gc*ga>0:
+# 				Va=Vc
+# 				ga=gc
+# 			else:
+# 				Vb=Vc
+# 				gb=gc
+# 			e=abs(Va-Vb)
+# 			itc+=1
+# 		V=Vc
+# 		for i in pvt:
+# 			comp_v[i]=pvt[i]['comp']*math.exp(K[i])/(1-V*(1- math.exp(K[i])))
+# 			comp_l[i]=pvt[i]['comp']/(1-V*(1- math.exp(K[i])))
+# 	return (V,comp_v,comp_l)
 def find_vapor_frcn(pvt,K):
-	g_0=rachford_rice_g(0,pvt,K)
-	comp_v={}
+	V=minimize_scalar(lambda x:rachford_rice_g(x,pvt,K)**2,bracket=[0,1],bounds=[0,1],method='bounded').x
 	comp_l={}
-	V=-1
-	if g_0<-1e-15:	#bubble point
-		V=0.0
-		for i in pvt:
-			comp_v[i]=pvt[i]['comp']*math.exp(K[i])
-			comp_l[i]=pvt[i]['comp']
-	else:
-		g_1=rachford_rice_g(1,pvt,K)
-		if g_1>1e-15: #dew point
-			V=1.0
-			for i in pvt:
-				comp_v[i]=pvt[i]['comp']
-				comp_l[i]=pvt[i]['comp']/math.exp(K[i])
-	if V==-1:
-		tol=0.00001
-		e=tol+1
-		Va=0.0
-		ga=g_0
-		Vb=1.0
-		gb=g_1
-		itc=0
-		while e>tol:
-			Vc=(Va+Vb)/2
-			gc=rachford_rice_g(Vc,pvt,K)
-			if gc*ga>0:
-				Va=Vc
-				ga=gc
-			else:
-				Vb=Vc
-				gb=gc
-			e=abs((Va-Vb)/Vc)
-			itc+=1
-		V=Vc
-		for i in pvt:
-			comp_v[i]=pvt[i]['comp']*math.exp(K[i])/(1-V*(1- math.exp(K[i])))
-			comp_l[i]=pvt[i]['comp']/(1-V*(1- math.exp(K[i])))
+	comp_v={}
+	for i in pvt:
+		comp_v[i] = pvt[i]['comp'] * math.exp(K[i]) / (1 - V * (1 - math.exp(K[i])))
+		comp_l[i] = pvt[i]['comp'] / (1 - V * (1 - math.exp(K[i])))
 	return (V,comp_v,comp_l)
 def cubic_solver(a,b,c,d):
 	"""returns real roots"""
@@ -184,7 +196,7 @@ def solve_PR_for_Z(pvt,T,P,comp=None):
 	Z= cubic_solver(A,B,C,D)
 	V=[R*T*i/P for i in Z]
 	# if len(V)==0:
-	# 	print T,P,comp
+	# 	print Tp,P,comp
 	return (Z,eos_params)
 def fug_minimum_gibbs(pvt,T,P,n,comp=None,returnV=False,phase="None"):
 	"""calculates fug coefs that correspond to minimum gibbs energy"""

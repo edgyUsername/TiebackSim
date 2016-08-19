@@ -98,7 +98,7 @@ def itterate_d(d,r_l,r_g,m_l,m_g,v_sl,v_sg,roughness,ID,theta,T,P):
 	sigma=estimateSigma(r_l,T,P)
 	NB=math.pow(m_l*v_sg/sigma,2)*r_g/r_l
 	FE=1/(1+1/(0.735*math.pow(NB,0.074)*math.pow(v_sg/v_sl,0.2)))
-	
+
 	D_f=4*d*(ID-d*ID)
 	v_f=v_sl*area*(1-FE)/Af
 	Re_f=D_f*r_l*v_f/m_l
@@ -174,8 +174,7 @@ def itterate_d_min(d,r_l,r_g,m_l,m_g,v_sl,v_sg,roughness,ID,theta,T,P):
 	v_f=v_sl*area*(1-FE)/Af
 	Re_f=D_f*r_l*v_f/m_l
 	f_f=g_s.calcFf(roughness,ID,Re_f)
-	
-	y=2*f_f*r_l*math.pow(v_sl*(1-FE),2)/((r_l-r_c)*9.81*ID*math.sin(theta))-math.pow(Vf,3)*(1-1.5*Vf)/(2-1.5*Vf)
+	y=2*f_f*r_l*math.pow(v_sl*(1-FE),2)-((r_l-r_c)*9.81*ID*math.sin(theta))*math.pow(Vf,3)*(1-1.5*Vf)/(2-1.5*Vf)
 
 	return y
 
@@ -349,6 +348,7 @@ def calcPressureDrop(P0,m,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
 		dp=log_interp(v_sg,v_sg_trans,v_sg_am,dp_trans,dp_am)
 	return (P0-dp,E_l,regime)
 def calcAmFroth(r_l,r_g,m_l,m_g,v_sl,v_sg,roughness,ID,theta,T,P0,L):
+	assert False
 	a=v_sg
 	b=a
 	am=False
@@ -363,7 +363,7 @@ def calcAmFroth(r_l,r_g,m_l,m_g,v_sl,v_sg,roughness,ID,theta,T,P0,L):
 			E_l_mist=v_sl*(v_f*FE+v_c*(1-FE))/(v_c*v_f)
 			if d<d_min and E_l_mist<=.24:
 				am=True
-		except AssertionError:
+		except:
 			pass
 		return (am,d,Af,Ac,Sl,Si,t_wL,t_i,FE)
 	while not am: 
@@ -452,6 +452,8 @@ def findRegime(P0,m,vapQ,r_g,r_l,m_g,m_l,z,roughness,ID,L,T):
 				if d<d_min and E_l_mist<=.24:
 					regime="annular mist"
 			except AssertionError:
+				print "film calc conversion error- skipping"
+			except ZeroDivisionError:
 				print "film calc conversion error- skipping"
 			if regime==None and E_ls<.48:			
 				# check "froth"
